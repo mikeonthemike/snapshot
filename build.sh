@@ -21,8 +21,9 @@ cat > "$APP/Contents/Info.plist" <<'EOF'
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>1.0</string>
   <key>CFBundleVersion</key><string>1</string>
-  <key>LSMinimumSystemVersion</key><string>13.0</string>
+  <key>LSMinimumSystemVersion</key><string>15.0</string>
   <key>LSUIElement</key><true/>
+  <key>NSMicrophoneUsageDescription</key><string>Snapshot can record your microphone alongside screen recordings.</string>
   <key>NSScreenCaptureUsageDescription</key><string>Snapshot needs screen recording access to capture screenshots.</string>
 </dict>
 </plist>

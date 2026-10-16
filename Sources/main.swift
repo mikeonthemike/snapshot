@@ -762,38 +762,203 @@ func makeRecordingFrame(screen: NSScreen, area: CGRect) -> NSWindow {
     return w
 }
 
+// MARK: - Recording controller bar
+
+/// Floating bar shown beside the recorded area: timer, pause/resume, mic, discard and stop.
+final class RecordingController: NSObject {
+    private let panel: NSPanel
+    private let timeLabel = NSTextField(labelWithString: "0:00")
+    private let dot = NSTextField(labelWithString: "●")
+    private let pauseButton = NSButton()
+    private let micButton = NSButton()
+    private var timer: Timer?
+
+    init(screen: NSScreen, area: CGRect) {
+        panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        super.init()
+        panel.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1)
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.hidesOnDeactivate = false
+        panel.isReleasedWhenClosed = false
+        panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
+
+        dot.textColor = .systemRed
+        dot.font = .systemFont(ofSize: 12)
+        timeLabel.font = .monospacedDigitSystemFont(ofSize: 13, weight: .medium)
+        timeLabel.textColor = .white
+
+        configure(pauseButton, "pause.fill", "Pause", #selector(togglePause))
+        configure(micButton, "mic.fill", "Mute microphone", #selector(toggleMic))
+        let discard = NSButton()
+        configure(discard, "trash", "Discard recording", #selector(discardTapped))
+        let stop = NSButton()
+        configure(stop, "stop.circle.fill", "Stop and save", #selector(stopTapped))
+        stop.contentTintColor = .systemRed
+
+        let stack = NSStackView(views: [dot, timeLabel, pauseButton, micButton, discard, stop])
+        stack.spacing = 6
+        stack.edgeInsets = NSEdgeInsets(top: 6, left: 12, bottom: 6, right: 8)
+        stack.setCustomSpacing(10, after: timeLabel)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        let fx = NSVisualEffectView()
+        fx.material = .hudWindow
+        fx.state = .active
+        fx.appearance = NSAppearance(named: .vibrantDark)
+        fx.wantsLayer = true
+        fx.layer?.cornerRadius = 12
+        fx.layer?.masksToBounds = true
+        fx.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: fx.leadingAnchor), stack.trailingAnchor.constraint(equalTo: fx.trailingAnchor),
+            stack.topAnchor.constraint(equalTo: fx.topAnchor), stack.bottomAnchor.constraint(equalTo: fx.bottomAnchor),
+        ])
+        let size = stack.fittingSize
+        fx.frame = CGRect(origin: .zero, size: size)
+        panel.contentView = fx
+        panel.setContentSize(size)
+        place(size: size, screen: screen, area: area)
+        panel.orderFrontRegardless()
+    }
+
+    private func configure(_ b: NSButton, _ symbol: String, _ tip: String, _ action: Selector) {
+        b.image = NSImage(systemSymbolName: symbol, accessibilityDescription: tip)
+        b.isBordered = false
+        b.contentTintColor = .white
+        b.toolTip = tip
+        b.target = self
+        b.action = action
+        b.widthAnchor.constraint(equalToConstant: 28).isActive = true
+        b.heightAnchor.constraint(equalToConstant: 26).isActive = true
+    }
+
+    private func place(size: NSSize, screen: NSScreen, area: CGRect) {
+        let f = screen.frame
+        let areaMinY = f.maxY - area.maxY   // bottom edge of the area, in AppKit coordinates
+        let areaMaxY = f.maxY - area.minY   // top edge
+        var y = areaMinY - size.height - 12
+        if y < f.minY + 4 { y = areaMaxY + 12 }
+        if y + size.height > f.maxY - 4 { y = areaMinY + 12 }
+        var x = f.minX + area.midX - size.width / 2
+        x = min(max(x, f.minX + 8), f.maxX - size.width - 8)
+        panel.setFrameOrigin(NSPoint(x: x, y: y))
+    }
+
+    var windowNumber: Int { panel.windowNumber }
+
+    func begin() {
+        refresh()
+        timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in self?.refresh() }
+    }
+
+    func close() {
+        timer?.invalidate()
+        panel.orderOut(nil)
+    }
+
+    private func refresh() {
+        let r = Recorder.shared
+        let t = Int(r.elapsed)
+        timeLabel.stringValue = String(format: "%d:%02d", t / 60, t % 60)
+        dot.textColor = r.isPaused ? .systemGray : .systemRed
+        let pauseSymbol = r.isPaused ? "play.fill" : "pause.fill"
+        pauseButton.image = NSImage(systemSymbolName: pauseSymbol, accessibilityDescription: nil)
+        pauseButton.toolTip = r.isPaused ? "Resume" : "Pause"
+        micButton.isEnabled = r.micAvailable
+        let micOn = r.micAvailable && !r.micMuted
+        micButton.image = NSImage(systemSymbolName: micOn ? "mic.fill" : "mic.slash.fill", accessibilityDescription: nil)
+        micButton.contentTintColor = micOn ? .white : .systemOrange
+        micButton.toolTip = !r.micAvailable ? "Microphone unavailable (check System Settings → Privacy → Microphone)"
+            : (r.micMuted ? "Unmute microphone" : "Mute microphone")
+    }
+
+    @objc private func togglePause() { Recorder.shared.togglePause(); refresh() }
+    @objc private func toggleMic() { Recorder.shared.toggleMic(); refresh() }
+    @objc private func discardTapped() { Recorder.shared.stop(discard: true) }
+    @objc private func stopTapped() { Recorder.shared.stop() }
+}
+
 // MARK: - Recorder
 
 final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
     static let shared = Recorder()
+
+    // Main-thread state
     private(set) var isRecording = false
+    private(set) var isPaused = false
+    private(set) var micAvailable = false
+    private(set) var micMuted = false
     var onChange: (() -> Void)?
 
     private var stream: SCStream?
-    private var writer: AVAssetWriter?
-    private var input: AVAssetWriterInput?
+    private var stopping = false
     private var url: URL?
     private var frameWindow: NSWindow?
-    private var sessionStarted = false
+    private var controller: RecordingController?
+    private var startDate = Date()
+    private var pausedTotal: TimeInterval = 0
+    private var pauseBegan: Date?
+
+    var elapsed: TimeInterval {
+        let current = pauseBegan.map { Date().timeIntervalSince($0) } ?? 0
+        return max(Date().timeIntervalSince(startDate) - pausedTotal - current, 0)
+    }
+
+    // Sample-queue state: only touched on `queue`
     private let queue = DispatchQueue(label: "snapshot.recorder")
+    private var writer: AVAssetWriter?
+    private var videoInput: AVAssetWriterInput?
+    private var audioInput: AVAssetWriterInput?
+    private var started = false
+    private var sessionStart = CMTime.zero
+    private var audioFormat: CMFormatDescription?
+    private var wantsMic = false
+    private var qPaused = false
+    private var qMuted = false
+    private var offset = CMTime.zero
+    private var pauseHostTime = CMTime.zero
+    private var streamStart = Date()
+    private var outputURL: URL?
+    private var width = 0
+    private var height = 0
+
+    static func requestMic() async -> Bool {
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized: return true
+        case .notDetermined: return await AVCaptureDevice.requestAccess(for: .audio)
+        default: return false
+        }
+    }
 
     func start(displayID: CGDirectDisplayID, rect: CGRect, scale: CGFloat) {
         guard !isRecording else { return }
         isRecording = true
+        stopping = false
         Task { @MainActor in
             do {
+                var mic = false
+                if #available(macOS 15.0, *) { mic = await Recorder.requestMic() }
+                micAvailable = mic
+                micMuted = false
+                isPaused = false
+
                 let screen = NSScreen.screens.first {
                     ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID) == displayID
                 } ?? NSScreen.main
                 if let screen = screen {
                     frameWindow = makeRecordingFrame(screen: screen, area: rect)
+                    controller = RecordingController(screen: screen, area: rect)
                     try? await Task.sleep(nanoseconds: 150_000_000)
                 }
                 let content = try await SCShareableContent.current
-                let excluded = content.windows.filter { $0.windowID == CGWindowID(self.frameWindow?.windowNumber ?? -1) }
                 guard let display = content.displays.first(where: { $0.displayID == displayID }) ?? content.displays.first else {
                     throw NSError(domain: "Snapshot", code: 1, userInfo: [NSLocalizedDescriptionKey: "No display found."])
                 }
+                let hidden = [frameWindow?.windowNumber, controller?.windowNumber].compactMap { $0 }.map { CGWindowID($0) }
+                let excluded = content.windows.filter { hidden.contains($0.windowID) }
+
                 let w = max(Int(rect.width * scale) & ~1, 2), h = max(Int(rect.height * scale) & ~1, 2)
                 let cfg = SCStreamConfiguration()
                 cfg.sourceRect = rect
@@ -803,24 +968,37 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
                 cfg.pixelFormat = kCVPixelFormatType_32BGRA
                 cfg.showsCursor = true
                 cfg.queueDepth = 6
+                if #available(macOS 15.0, *), mic { cfg.captureMicrophone = true }
 
                 let url = Output.newURL(prefix: "Recording", ext: "mov")
-                let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
-                let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
-                    AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: w, AVVideoHeightKey: h,
-                ])
-                input.expectsMediaDataInRealTime = true
-                writer.add(input)
-                guard writer.startWriting() else { throw writer.error ?? NSError(domain: "Snapshot", code: 2) }
+                self.url = url
+                queue.sync {
+                    writer = nil
+                    videoInput = nil
+                    audioInput = nil
+                    started = false
+                    audioFormat = nil
+                    wantsMic = mic
+                    qPaused = false
+                    qMuted = false
+                    offset = .zero
+                    streamStart = Date()
+                    outputURL = url
+                    width = w
+                    height = h
+                }
 
                 let stream = SCStream(filter: SCContentFilter(display: display, excludingWindows: excluded), configuration: cfg, delegate: self)
                 try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
-                self.writer = writer
-                self.input = input
-                self.url = url
-                self.sessionStarted = false
+                if #available(macOS 15.0, *), mic {
+                    try stream.addStreamOutput(self, type: .microphone, sampleHandlerQueue: queue)
+                }
                 self.stream = stream
                 try await stream.startCapture()
+                startDate = Date()
+                pausedTotal = 0
+                pauseBegan = nil
+                controller?.begin()
                 onChange?()
             } catch {
                 fail(error)
@@ -828,56 +1006,165 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
         }
     }
 
-    func stop() {
-        guard isRecording, let stream = stream else { return }
+    func togglePause() {
+        guard isRecording, stream != nil else { return }
+        if isPaused {
+            pausedTotal += pauseBegan.map { Date().timeIntervalSince($0) } ?? 0
+            pauseBegan = nil
+            isPaused = false
+            queue.sync {
+                let gap = CMTimeSubtract(CMClockGetTime(CMClockGetHostTimeClock()), pauseHostTime)
+                offset = CMTimeAdd(offset, gap)
+                qPaused = false
+            }
+        } else {
+            isPaused = true
+            pauseBegan = Date()
+            queue.sync {
+                pauseHostTime = CMClockGetTime(CMClockGetHostTimeClock())
+                qPaused = true
+            }
+        }
+    }
+
+    func toggleMic() {
+        guard micAvailable else { return }
+        micMuted.toggle()
+        queue.sync { qMuted = micMuted }
+    }
+
+    func stop(discard: Bool = false) {
+        guard isRecording, !stopping, let stream = stream else { return }
+        stopping = true
         Task { @MainActor in
             try? await stream.stopCapture()
-            queue.sync {
-                input?.markAsFinished()
+            let (writer, wasStarted): (AVAssetWriter?, Bool) = queue.sync {
+                videoInput?.markAsFinished()
+                audioInput?.markAsFinished()
+                return (self.writer, started)
             }
-            let url = self.url
-            if sessionStarted, let writer = writer {
+            if wasStarted, let writer = writer {
                 await writer.finishWriting()
             } else {
                 writer?.cancelWriting()
             }
+            let url = self.url
             reset()
             onChange?()
-            if let url = url, FileManager.default.fileExists(atPath: url.path) {
+            guard let url = url else { return }
+            let exists = FileManager.default.fileExists(atPath: url.path)
+            if discard {
+                try? FileManager.default.removeItem(at: url)
+            } else if exists && wasStarted {
                 NSWorkspace.shared.activateFileViewerSelecting([url])
+            } else {
+                showError("Nothing was recorded.")
             }
         }
     }
 
     private func reset() {
         isRecording = false
+        isPaused = false
+        stopping = false
+        pauseBegan = nil
         frameWindow?.orderOut(nil)
         frameWindow = nil
+        controller?.close()
+        controller = nil
         stream = nil
-        writer = nil
-        input = nil
         url = nil
+    }
+
+    private func showError(_ text: String) {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Recording problem"
+        alert.informativeText = text
+        alert.runModal()
     }
 
     private func fail(_ error: Error) {
         reset()
         onChange?()
-        NSApp.activate(ignoringOtherApps: true)
-        let alert = NSAlert()
-        alert.messageText = "Couldn't start recording"
-        alert.informativeText = error.localizedDescription
-        alert.runModal()
+        showError(error.localizedDescription)
     }
 
+    // MARK: Sample handling (runs on `queue`)
+
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
-        guard type == .screen, sampleBuffer.isValid, let writer = writer, let input = input else { return }
-        guard let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]],
-              let raw = attachments.first?[.status] as? Int, SCFrameStatus(rawValue: raw) == .complete else { return }
-        if !sessionStarted {
-            writer.startSession(atSourceTime: CMSampleBufferGetPresentationTimeStamp(sampleBuffer))
-            sessionStarted = true
+        guard sampleBuffer.isValid else { return }
+        if type == .screen {
+            handleVideo(sampleBuffer)
+        } else if #available(macOS 15.0, *), type == .microphone {
+            handleAudio(sampleBuffer)
         }
-        if input.isReadyForMoreMediaData { input.append(sampleBuffer) }
+    }
+
+    private func handleVideo(_ sb: CMSampleBuffer) {
+        guard let attachments = CMSampleBufferGetSampleAttachmentsArray(sb, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]],
+              let raw = attachments.first?[.status] as? Int, SCFrameStatus(rawValue: raw) == .complete, !qPaused else { return }
+        if !started {
+            // Wait briefly for the first microphone buffer so the audio track can match its format.
+            if wantsMic, audioFormat == nil, Date().timeIntervalSince(streamStart) < 1.5 { return }
+            guard startWriter(at: CMSampleBufferGetPresentationTimeStamp(sb)) else { return }
+        }
+        guard let input = videoInput, writer?.status == .writing, input.isReadyForMoreMediaData, let out = retimed(sb) else { return }
+        input.append(out)
+    }
+
+    private func handleAudio(_ sb: CMSampleBuffer) {
+        if !started {
+            if audioFormat == nil { audioFormat = CMSampleBufferGetFormatDescription(sb) }
+            return
+        }
+        guard let input = audioInput, !qPaused, !qMuted, writer?.status == .writing, input.isReadyForMoreMediaData,
+              let out = retimed(sb), CMTimeCompare(CMSampleBufferGetPresentationTimeStamp(out), sessionStart) >= 0 else { return }
+        input.append(out)
+    }
+
+    private func startWriter(at pts: CMTime) -> Bool {
+        guard let url = outputURL, let w = try? AVAssetWriter(outputURL: url, fileType: .mov) else { return false }
+        let vi = AVAssetWriterInput(mediaType: .video, outputSettings: [
+            AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: width, AVVideoHeightKey: height,
+        ])
+        vi.expectsMediaDataInRealTime = true
+        guard w.canAdd(vi) else { return false }
+        w.add(vi)
+        if wantsMic, let fmt = audioFormat, let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(fmt)?.pointee {
+            let ai = AVAssetWriterInput(mediaType: .audio, outputSettings: [
+                AVFormatIDKey: kAudioFormatMPEG4AAC,
+                AVSampleRateKey: asbd.mSampleRate,
+                AVNumberOfChannelsKey: Int(asbd.mChannelsPerFrame),
+                AVEncoderBitRateKey: 96_000,
+            ], sourceFormatHint: fmt)
+            ai.expectsMediaDataInRealTime = true
+            if w.canAdd(ai) { w.add(ai); audioInput = ai }
+        }
+        guard w.startWriting() else { return false }
+        w.startSession(atSourceTime: pts)
+        writer = w
+        videoInput = vi
+        sessionStart = pts
+        started = true
+        return true
+    }
+
+    /// Shifts a buffer's timestamps back by the total time spent paused so the video has no gap.
+    private func retimed(_ sb: CMSampleBuffer) -> CMSampleBuffer? {
+        if CMTimeCompare(offset, .zero) == 0 { return sb }
+        var count: CMItemCount = 0
+        CMSampleBufferGetSampleTimingInfoArray(sb, entryCount: 0, arrayToFill: nil, entriesNeededOut: &count)
+        var infos = [CMSampleTimingInfo](repeating: CMSampleTimingInfo(), count: count)
+        CMSampleBufferGetSampleTimingInfoArray(sb, entryCount: count, arrayToFill: &infos, entriesNeededOut: &count)
+        for i in infos.indices {
+            infos[i].presentationTimeStamp = CMTimeSubtract(infos[i].presentationTimeStamp, offset)
+            if infos[i].decodeTimeStamp.isValid { infos[i].decodeTimeStamp = CMTimeSubtract(infos[i].decodeTimeStamp, offset) }
+        }
+        var out: CMSampleBuffer?
+        CMSampleBufferCreateCopyWithNewTiming(allocator: kCFAllocatorDefault, sampleBuffer: sb, sampleTimingEntryCount: count,
+                                              sampleTimingArray: &infos, sampleBufferOut: &out)
+        return out
     }
 
     func stream(_ stream: SCStream, didStopWithError error: Error) {

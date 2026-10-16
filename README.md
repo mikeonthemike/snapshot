@@ -10,13 +10,13 @@ Press a hotkey, drag over the area you want, mark it up, and copy it, save it, p
 - **Annotations** – rectangles, arrows, freehand pen and text, with a color picker and undo.
 - **Copy or save** – copy to the clipboard in one keystroke, or save a PNG to your chosen folder.
 - **Pin to screen** – float a capture above your other windows. Drag to move, scroll to resize, change opacity from the right-click menu, and double-click to dismiss.
-- **Screen recording** – record the selected area to an H.264 `.mov`, with the recorded region left clear and everything around it dimmed.
+- **Screen recording** – record the selected area to an H.264 `.mov`, with the recorded region left clear and everything around it dimmed. A floating control bar beside the area gives you a timer, pause/resume, microphone mute, discard and stop.
 - **Full-screen capture** – grab the whole display from the menu.
 - **Settings** – choose where screenshots and recordings are saved.
 
 ## Requirements
 
-- macOS 13 or later
+- macOS 15 or later
 - Swift command line tools (`xcode-select --install`)
 
 ## Build and run
@@ -32,7 +32,7 @@ To start Snapshot at login, add `Snapshot.app` under **System Settings → Gener
 
 ### Permissions
 
-The first time you capture, macOS asks for **Screen Recording** access. Enable Snapshot under **System Settings → Privacy & Security → Screen Recording**, then quit and reopen the app.
+The first time you capture, macOS asks for **Screen Recording** access. The first recording also asks for **Microphone** access; decline it to record without audio. Enable Snapshot under **System Settings → Privacy & Security → Screen Recording**, then quit and reopen the app.
 
 ## Usage
 
@@ -45,7 +45,7 @@ The first time you capture, macOS asks for **Screen Recording** access. Enable S
 | Record selection | `⌘R` |
 | Undo annotation | `⌘Z` |
 | Cancel | `Esc` |
-| Stop recording | Click the stop control in the menu bar, or press `⌥⇧A` |
+| Stop recording | Stop button on the control bar, or press `⌥⇧A` |
 
 The same actions are available from the toolbar that appears beside your selection, and from the menu bar icon. Open **Settings…** from the menu to change the save folder.
 
@@ -61,7 +61,7 @@ BACKLOG.md           Planned improvements
 
 ## Roadmap
 
-See [BACKLOG.md](BACKLOG.md) for planned work, including a floating recording controller, a configurable hotkey, and audio and GIF export.
+See [BACKLOG.md](BACKLOG.md) for planned work, including a configurable hotkey, system audio and GIF export.
 
 ## License
 
