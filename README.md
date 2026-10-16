@@ -12,7 +12,7 @@ Press a hotkey, drag over the area you want, mark it up, and copy it, save it, p
 - **Pin to screen** – float a capture above your other windows. Drag to move, scroll to resize, change opacity from the right-click menu, and double-click to dismiss.
 - **Screen recording** – record the selected area to an H.264 `.mov`, with the recorded region left clear and everything around it dimmed. A floating control bar beside the area gives you a timer, pause/resume, microphone mute, discard and stop.
 - **Full-screen capture** – grab the whole display from the menu.
-- **Settings** – choose where screenshots and recordings are saved.
+- **Settings** – choose where screenshots and recordings are saved, and rebind the global capture shortcuts.
 
 ## Requirements
 
@@ -38,16 +38,17 @@ The first time you capture, macOS asks for **Screen Recording** access. The firs
 
 | Action | Shortcut |
 | --- | --- |
-| Start a capture | `⌥⇧A` |
+| Start a capture | `⌥⇧A` (configurable) |
+| Capture the full screen | `⌥⇧F` (configurable) |
 | Copy selection | `Return` or `⌘C` |
 | Save selection | `⌘S` |
 | Pin selection | `⌘P` |
 | Record selection | `⌘R` |
 | Undo annotation | `⌘Z` |
 | Cancel | `Esc` |
-| Stop recording | Stop button on the control bar, or press `⌥⇧A` |
+| Stop recording | Stop button on the control bar, or press the capture hotkey |
 
-The same actions are available from the toolbar that appears beside your selection, and from the menu bar icon. Open **Settings…** from the menu to change the save folder.
+The same actions are available from the toolbar that appears beside your selection, and from the menu bar icon. Open **Settings…** from the menu to change the save folder and the global shortcuts.
 
 While recording, macOS shows its own "Stop Sharing" control in the menu bar. Snapshot saves the video correctly whichever stop control you use.
 
@@ -61,7 +62,7 @@ BACKLOG.md           Planned improvements
 
 ## Roadmap
 
-See [BACKLOG.md](BACKLOG.md) for planned work, including a configurable hotkey, system audio and GIF export.
+See [BACKLOG.md](BACKLOG.md) for planned work, including system audio and GIF export.
 
 ## License
 

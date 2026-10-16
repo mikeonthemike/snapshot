@@ -651,12 +651,204 @@ final class PinView: NSView {
     @objc func closePin() { (window as? PinWindow)?.closePin() }
 }
 
+// MARK: - Hotkeys
+
+struct HotKey: Codable, Equatable {
+    var keyCode: UInt32
+    var modifiers: UInt32   // Carbon modifier mask
+    var key: String         // display label for the key
+
+    var display: String {
+        var m = ""
+        if modifiers & UInt32(controlKey) != 0 { m += "⌃" }
+        if modifiers & UInt32(optionKey) != 0 { m += "⌥" }
+        if modifiers & UInt32(shiftKey) != 0 { m += "⇧" }
+        if modifiers & UInt32(cmdKey) != 0 { m += "⌘" }
+        return m + key
+    }
+
+    /// Key equivalent for showing the shortcut beside a menu item (single-character keys only).
+    var menuKey: String { key.count == 1 ? key.lowercased() : "" }
+
+    var menuMask: NSEvent.ModifierFlags {
+        var f: NSEvent.ModifierFlags = []
+        if modifiers & UInt32(controlKey) != 0 { f.insert(.control) }
+        if modifiers & UInt32(optionKey) != 0 { f.insert(.option) }
+        if modifiers & UInt32(shiftKey) != 0 { f.insert(.shift) }
+        if modifiers & UInt32(cmdKey) != 0 { f.insert(.command) }
+        return f
+    }
+
+    static func carbonModifiers(_ flags: NSEvent.ModifierFlags) -> UInt32 {
+        var m: UInt32 = 0
+        if flags.contains(.control) { m |= UInt32(controlKey) }
+        if flags.contains(.option) { m |= UInt32(optionKey) }
+        if flags.contains(.shift) { m |= UInt32(shiftKey) }
+        if flags.contains(.command) { m |= UInt32(cmdKey) }
+        return m
+    }
+
+    static func label(for event: NSEvent) -> String {
+        let special: [UInt16: String] = [
+            49: "Space", 36: "↩", 48: "⇥", 51: "⌫", 123: "←", 124: "→", 125: "↓", 126: "↑",
+            122: "F1", 120: "F2", 99: "F3", 118: "F4", 96: "F5", 97: "F6", 98: "F7", 100: "F8", 101: "F9",
+            109: "F10", 103: "F11", 111: "F12",
+        ]
+        return special[event.keyCode] ?? (event.charactersIgnoringModifiers ?? "?").uppercased()
+    }
+}
+
+enum HotKeyAction: UInt32, CaseIterable {
+    case capture = 1, fullScreen = 2
+
+    var defaultsKey: String { "hotkey.\(rawValue)" }
+    var title: String { self == .capture ? "Capture area" : "Capture full screen" }
+    var fallback: HotKey {
+        switch self {
+        case .capture: return HotKey(keyCode: UInt32(kVK_ANSI_A), modifiers: UInt32(optionKey | shiftKey), key: "A")
+        case .fullScreen: return HotKey(keyCode: UInt32(kVK_ANSI_F), modifiers: UInt32(optionKey | shiftKey), key: "F")
+        }
+    }
+}
+
+final class HotKeys {
+    static let shared = HotKeys()
+    var onChange: (() -> Void)?
+    private(set) var failed: Set<HotKeyAction> = []
+    private var refs: [HotKeyAction: EventHotKeyRef] = [:]
+
+    func binding(_ a: HotKeyAction) -> HotKey {
+        if let data = UserDefaults.standard.data(forKey: a.defaultsKey), let hk = try? JSONDecoder().decode(HotKey.self, from: data) {
+            return hk
+        }
+        return a.fallback
+    }
+
+    func set(_ hk: HotKey?, for a: HotKeyAction) {
+        if let hk = hk, hk != a.fallback, let data = try? JSONEncoder().encode(hk) {
+            UserDefaults.standard.set(data, forKey: a.defaultsKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: a.defaultsKey)
+        }
+        registerAll()
+        onChange?()
+    }
+
+    func install() {
+        var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        InstallEventHandler(GetApplicationEventTarget(), { _, event, _ in
+            var id = EventHotKeyID()
+            GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil,
+                              MemoryLayout<EventHotKeyID>.size, nil, &id)
+            let raw = id.id
+            DispatchQueue.main.async { HotKeys.handle(raw) }
+            return noErr
+        }, 1, &spec, nil, nil)
+        registerAll()
+    }
+
+    static func handle(_ raw: UInt32) {
+        switch HotKeyAction(rawValue: raw) {
+        case .capture:
+            if Recorder.shared.isRecording { Recorder.shared.stop() } else { CaptureController.shared.begin() }
+        case .fullScreen:
+            if !Recorder.shared.isRecording { CaptureController.shared.fullScreen() }
+        case nil:
+            break
+        }
+    }
+
+    func unregisterAll() {
+        refs.values.forEach { UnregisterEventHotKey($0) }
+        refs = [:]
+    }
+
+    func registerAll() {
+        unregisterAll()
+        failed = []
+        for a in HotKeyAction.allCases {
+            let hk = binding(a)
+            var ref: EventHotKeyRef?
+            let status = RegisterEventHotKey(hk.keyCode, hk.modifiers, EventHotKeyID(signature: 0x534E4150, id: a.rawValue),
+                                             GetApplicationEventTarget(), 0, &ref)
+            if status == noErr, let ref = ref { refs[a] = ref } else { failed.insert(a) }
+        }
+    }
+}
+
+/// A button that records the next key combination pressed.
+final class HotkeyField: NSButton {
+    let slot: HotKeyAction
+    var onChange: (() -> Void)?
+    private var monitor: Any?
+
+    init(slot: HotKeyAction) {
+        self.slot = slot
+        super.init(frame: .zero)
+        bezelStyle = .rounded
+        target = self
+        action = #selector(toggle)
+        widthAnchor.constraint(equalToConstant: 130).isActive = true
+        refresh()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    func refresh() {
+        title = monitor != nil ? "Press shortcut…" : HotKeys.shared.binding(slot).display
+    }
+
+    @objc private func toggle() { monitor == nil ? begin() : cancel() }
+
+    private func begin() {
+        HotKeys.shared.unregisterAll()
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            self?.handle(event)
+            return nil
+        }
+        refresh()
+    }
+
+    private func handle(_ event: NSEvent) {
+        if event.keyCode == 53 { cancel(); return }
+        let mods = HotKey.carbonModifiers(event.modifierFlags.intersection(.deviceIndependentFlagsMask))
+        // Require ⌘, ⌥ or ⌃ so the shortcut doesn't swallow normal typing.
+        guard mods & UInt32(cmdKey | optionKey | controlKey) != 0 else { NSSound.beep(); return }
+        let hk = HotKey(keyCode: UInt32(event.keyCode), modifiers: mods, key: HotKey.label(for: event))
+        if let other = HotKeyAction.allCases.first(where: { $0 != slot && HotKeys.shared.binding($0) == hk }) {
+            NSSound.beep()
+            toolTip = "Already used for “\(other.title)”"
+            return
+        }
+        toolTip = nil
+        endRecording()
+        HotKeys.shared.set(hk, for: slot)
+        refresh()
+        onChange?()
+    }
+
+    func cancel() {
+        guard monitor != nil else { return }
+        endRecording()
+        HotKeys.shared.registerAll()
+        refresh()
+        onChange?()
+    }
+
+    private func endRecording() {
+        if let m = monitor { NSEvent.removeMonitor(m) }
+        monitor = nil
+    }
+}
+
 // MARK: - Settings
 
-final class SettingsController: NSObject {
+final class SettingsController: NSObject, NSWindowDelegate {
     static let shared = SettingsController()
     private var window: NSWindow?
     private let pathField = NSTextField(labelWithString: "")
+    private var fields: [HotkeyField] = []
+    private var warnings: [HotKeyAction: NSTextField] = [:]
 
     func show() {
         if window == nil { build() }
@@ -665,39 +857,72 @@ final class SettingsController: NSObject {
         window?.makeKeyAndOrderFront(nil)
     }
 
+    private func heading(_ text: String) -> NSTextField {
+        let l = NSTextField(labelWithString: text)
+        l.font = .boldSystemFont(ofSize: 13)
+        return l
+    }
+
     private func build() {
-        let title = NSTextField(labelWithString: "Save screenshots and recordings to:")
-        title.font = .boldSystemFont(ofSize: 13)
         pathField.lineBreakMode = .byTruncatingMiddle
         pathField.font = .systemFont(ofSize: 12)
         pathField.textColor = .secondaryLabelColor
         pathField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         let choose = NSButton(title: "Choose…", target: self, action: #selector(choose))
-        let reset = NSButton(title: "Reset to Desktop", target: self, action: #selector(reset))
-        let buttons = NSStackView(views: [choose, reset])
-        buttons.spacing = 8
+        let resetFolder = NSButton(title: "Reset to Desktop", target: self, action: #selector(resetFolder))
+        let folderButtons = NSStackView(views: [choose, resetFolder])
+        folderButtons.spacing = 8
 
-        let stack = NSStackView(views: [title, pathField, buttons])
+        var rows: [NSView] = []
+        for a in HotKeyAction.allCases {
+            let label = NSTextField(labelWithString: a.title + ":")
+            label.widthAnchor.constraint(equalToConstant: 140).isActive = true
+            let field = HotkeyField(slot: a)
+            field.onChange = { [weak self] in self?.refresh() }
+            fields.append(field)
+            let warn = NSTextField(labelWithString: "")
+            warn.font = .systemFont(ofSize: 11)
+            warn.textColor = .systemOrange
+            warnings[a] = warn
+            let row = NSStackView(views: [label, field, warn])
+            row.spacing = 8
+            rows.append(row)
+        }
+        let resetKeys = NSButton(title: "Reset Shortcuts", target: self, action: #selector(resetKeys))
+
+        let stack = NSStackView(views: [
+            heading("Save screenshots and recordings to:"), pathField, folderButtons,
+            heading("Shortcuts"),
+        ] + rows + [resetKeys])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 10
+        stack.setCustomSpacing(22, after: folderButtons)
         stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
 
-        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 440, height: 130),
+        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 260),
                          styleMask: [.titled, .closable], backing: .buffered, defer: false)
         w.title = "Snapshot Settings"
         w.isReleasedWhenClosed = false
+        w.delegate = self
         w.contentView = stack
-        pathField.preferredMaxLayoutWidth = 400
-        w.setContentSize(NSSize(width: 440, height: stack.fittingSize.height))
+        pathField.preferredMaxLayoutWidth = 420
+        w.setContentSize(NSSize(width: 460, height: stack.fittingSize.height))
         w.center()
         window = w
     }
 
     private func refresh() {
         pathField.stringValue = (Output.folder.path as NSString).abbreviatingWithTildeInPath
+        fields.forEach { $0.refresh() }
+        for (a, label) in warnings {
+            label.stringValue = HotKeys.shared.failed.contains(a) ? "In use by another app" : ""
+        }
     }
+
+    func windowWillClose(_ notification: Notification) { fields.forEach { $0.cancel() } }
+    func windowDidResignKey(_ notification: Notification) { fields.forEach { $0.cancel() } }
 
     @objc private func choose() {
         let panel = NSOpenPanel()
@@ -714,8 +939,13 @@ final class SettingsController: NSObject {
         }
     }
 
-    @objc private func reset() {
+    @objc private func resetFolder() {
         Output.folder = Output.defaultFolder
+        refresh()
+    }
+
+    @objc private func resetKeys() {
+        HotKeyAction.allCases.forEach { HotKeys.shared.set(nil, for: $0) }
         refresh()
     }
 }
@@ -1254,32 +1484,31 @@ final class CaptureController {
 
 // MARK: - App
 
-var hotKeyRef: EventHotKeyRef?
-
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
     var idleMenu: NSMenu?
     var tickTimer: Timer?
     var recordingStart = Date()
+    var captureItem: NSMenuItem!
+    var fullItem: NSMenuItem!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         let icon = NSImage(systemSymbolName: "viewfinder", accessibilityDescription: "Snapshot")
         icon?.isTemplate = true
         statusItem.button?.image = icon
-        statusItem.button?.toolTip = "Snapshot — capture screenshots (⌥⇧A)"
+        statusItem.button?.toolTip = "Snapshot — capture screenshots"
 
         let menu = NSMenu()
-        let cap = menu.addItem(withTitle: "Capture Area", action: #selector(captureArea), keyEquivalent: "a")
-        cap.keyEquivalentModifierMask = [.option, .shift]
-        menu.addItem(withTitle: "Capture Full Screen", action: #selector(captureFull), keyEquivalent: "")
+        captureItem = menu.addItem(withTitle: "Capture Area", action: #selector(captureArea), keyEquivalent: "")
+        fullItem = menu.addItem(withTitle: "Capture Full Screen", action: #selector(captureFull), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Open Save Folder", action: #selector(openFolder), keyEquivalent: "")
         menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit Snapshot", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         let tips = [
-            "Capture Area": "Drag to select a region, then annotate, copy, save or record it (⌥⇧A)",
+            "Capture Area": "Drag to select a region, then annotate, copy, save or record it",
             "Capture Full Screen": "Capture the whole main display to the clipboard and your save folder",
             "Open Save Folder": "Open the folder where screenshots and recordings are saved",
             "Settings…": "Choose where screenshots and recordings are saved",
@@ -1291,15 +1520,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         idleMenu = menu
         Recorder.shared.onChange = { [weak self] in self?.recordingChanged() }
 
-        var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
-            DispatchQueue.main.async {
-                if Recorder.shared.isRecording { Recorder.shared.stop() } else { CaptureController.shared.begin() }
-            }
-            return noErr
-        }, 1, &spec, nil, nil)
-        RegisterEventHotKey(UInt32(kVK_ANSI_A), UInt32(optionKey | shiftKey), EventHotKeyID(signature: 0x534E4150, id: 1),
-                            GetApplicationEventTarget(), 0, &hotKeyRef)
+        HotKeys.shared.onChange = { [weak self] in self?.applyHotkeys() }
+        HotKeys.shared.install()
+        applyHotkeys()
+    }
+
+    /// Shows the current shortcuts in the menu and tooltips.
+    func applyHotkeys() {
+        let cap = HotKeys.shared.binding(.capture), full = HotKeys.shared.binding(.fullScreen)
+        for (item, hk) in [(captureItem!, cap), (fullItem!, full)] {
+            item.keyEquivalent = hk.menuKey
+            item.keyEquivalentModifierMask = hk.menuMask
+        }
+        captureItem.toolTip = "Drag to select a region, then annotate, copy, save or record it (\(cap.display))"
+        fullItem.toolTip = "Capture the whole main display to the clipboard and your save folder (\(full.display))"
+        if !Recorder.shared.isRecording {
+            statusItem.button?.toolTip = "Snapshot — capture screenshots (\(cap.display))"
+        }
     }
 
     // Delay so the menu closes before the screen is grabbed.
@@ -1322,7 +1559,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.image = NSImage(systemSymbolName: "stop.circle.fill", accessibilityDescription: "Stop recording")
             button.image?.isTemplate = false
             button.contentTintColor = .systemRed
-            button.toolTip = "Stop Recording (⌥⇧A)"
+            button.toolTip = "Stop Recording (\(HotKeys.shared.binding(.capture).display))"
             recordingStart = Date()
             tickTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in self?.tick() }
             tick()
@@ -1334,7 +1571,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let icon = NSImage(systemSymbolName: "viewfinder", accessibilityDescription: "Snapshot")
             icon?.isTemplate = true
             button.image = icon
-            button.toolTip = "Snapshot — capture screenshots (⌥⇧A)"
+            applyHotkeys()
             statusItem.menu = idleMenu
         }
     }
