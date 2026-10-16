@@ -38,8 +38,8 @@ The first time you capture, macOS asks for **Screen Recording** access. The firs
 
 | Action | Shortcut |
 | --- | --- |
-| Start a capture | `⌥⇧A` (configurable) |
-| Capture the full screen | `⌥⇧F` (configurable) |
+| Start a capture | `⌃⌥A` (configurable) |
+| Capture the full screen | `⌃⌥F` (configurable) |
 | Copy selection | `Return` or `⌘C` |
 | Save selection | `⌘S` |
 | Pin selection | `⌘P` |

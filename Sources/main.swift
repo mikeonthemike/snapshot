@@ -456,6 +456,7 @@ final class CaptureView: NSView, NSTextFieldDelegate {
         pb.clearContents()
         pb.setData(png, forType: .png)
         CaptureController.shared.finish()
+        Feedback.toast("Copied to clipboard")
     }
 
     @objc func pin() {
@@ -483,11 +484,12 @@ final class CaptureView: NSView, NSTextFieldDelegate {
 
     @objc func save() {
         guard let rep = render(), let png = rep.representation(using: .png, properties: [:]) else { return }
-        Output.save(png: png)
+        let saved = Output.save(png: png)
         let pb = NSPasteboard.general
         pb.clearContents()
         pb.setData(png, forType: .png)
         CaptureController.shared.finish()
+        Feedback.toast(saved != nil ? "Saved to \(Output.folder.lastPathComponent) and copied" : "Copied to clipboard")
     }
 
     override func keyDown(with event: NSEvent) {
@@ -705,8 +707,8 @@ enum HotKeyAction: UInt32, CaseIterable {
     var title: String { self == .capture ? "Capture area" : "Capture full screen" }
     var fallback: HotKey {
         switch self {
-        case .capture: return HotKey(keyCode: UInt32(kVK_ANSI_A), modifiers: UInt32(optionKey | shiftKey), key: "A")
-        case .fullScreen: return HotKey(keyCode: UInt32(kVK_ANSI_F), modifiers: UInt32(optionKey | shiftKey), key: "F")
+        case .capture: return HotKey(keyCode: UInt32(kVK_ANSI_A), modifiers: UInt32(controlKey | optionKey), key: "A")
+        case .fullScreen: return HotKey(keyCode: UInt32(kVK_ANSI_F), modifiers: UInt32(controlKey | optionKey), key: "F")
         }
     }
 }
@@ -812,8 +814,12 @@ final class HotkeyField: NSButton {
     private func handle(_ event: NSEvent) {
         if event.keyCode == 53 { cancel(); return }
         let mods = HotKey.carbonModifiers(event.modifierFlags.intersection(.deviceIndependentFlagsMask))
-        // Require ⌘, ⌥ or ⌃ so the shortcut doesn't swallow normal typing.
-        guard mods & UInt32(cmdKey | optionKey | controlKey) != 0 else { NSSound.beep(); return }
+        // macOS 15+ ignores global hotkeys that use only ⌥ and/or ⇧, so require ⌘ or ⌃.
+        guard mods & UInt32(cmdKey | controlKey) != 0 else {
+            NSSound.beep()
+            toolTip = "Include ⌃ or ⌘ — macOS ignores shortcuts that only use ⌥ and ⇧"
+            return
+        }
         let hk = HotKey(keyCode: UInt32(event.keyCode), modifiers: mods, key: HotKey.label(for: event))
         if let other = HotKeyAction.allCases.first(where: { $0 != slot && HotKeys.shared.binding($0) == hk }) {
             NSSound.beep()
@@ -1402,6 +1408,85 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
     }
 }
 
+// MARK: - Feedback
+
+/// Brief on-screen confirmation that a capture worked.
+enum Feedback {
+    private static var live: [NSWindow] = []
+
+    private static func fade(_ w: NSWindow, after delay: TimeInterval, duration: TimeInterval) {
+        live.append(w)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            NSAnimationContext.runAnimationGroup({ ctx in
+                ctx.duration = duration
+                w.animator().alphaValue = 0
+            }, completionHandler: {
+                w.orderOut(nil)
+                live.removeAll { $0 === w }
+            })
+        }
+    }
+
+    static func flash() {
+        guard let screen = NSScreen.main else { return }
+        let w = NSWindow(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
+        w.level = .screenSaver
+        w.backgroundColor = NSColor.white.withAlphaComponent(0.55)
+        w.isOpaque = false
+        w.hasShadow = false
+        w.ignoresMouseEvents = true
+        w.isReleasedWhenClosed = false
+        w.collectionBehavior = [.canJoinAllSpaces, .stationary]
+        w.orderFrontRegardless()
+        fade(w, after: 0.02, duration: 0.3)
+        let sound = NSSound(contentsOfFile: "/System/Library/Components/CoreAudio.component/Contents/SharedSupport/SystemSounds/system/Screen Capture.aif",
+                            byReference: true)
+        (sound ?? NSSound(named: "Pop"))?.play()
+    }
+
+    static func toast(_ text: String, symbol: String = "checkmark.circle.fill") {
+        guard let screen = NSScreen.main else { return }
+        let icon = NSImageView(image: NSImage(systemSymbolName: symbol, accessibilityDescription: nil) ?? NSImage())
+        icon.contentTintColor = .systemGreen
+        let label = NSTextField(labelWithString: text)
+        label.font = .systemFont(ofSize: 14, weight: .medium)
+        label.textColor = .white
+        let stack = NSStackView(views: [icon, label])
+        stack.spacing = 8
+        stack.edgeInsets = NSEdgeInsets(top: 10, left: 16, bottom: 10, right: 18)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        let fx = NSVisualEffectView()
+        fx.material = .hudWindow
+        fx.state = .active
+        fx.appearance = NSAppearance(named: .vibrantDark)
+        fx.wantsLayer = true
+        fx.layer?.cornerRadius = 12
+        fx.layer?.masksToBounds = true
+        fx.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: fx.leadingAnchor), stack.trailingAnchor.constraint(equalTo: fx.trailingAnchor),
+            stack.topAnchor.constraint(equalTo: fx.topAnchor), stack.bottomAnchor.constraint(equalTo: fx.bottomAnchor),
+        ])
+        let size = stack.fittingSize
+        fx.frame = CGRect(origin: .zero, size: size)
+        let vf = screen.visibleFrame
+        let w = NSPanel(contentRect: CGRect(x: vf.midX - size.width / 2, y: vf.minY + 70, width: size.width, height: size.height),
+                        styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        w.level = .screenSaver
+        w.isOpaque = false
+        w.backgroundColor = .clear
+        w.hasShadow = true
+        w.ignoresMouseEvents = true
+        w.isReleasedWhenClosed = false
+        w.collectionBehavior = [.canJoinAllSpaces, .stationary]
+        w.contentView = fx
+        w.alphaValue = 0
+        w.orderFrontRegardless()
+        w.animator().alphaValue = 1
+        fade(w, after: 1.8, duration: 0.4)
+    }
+}
+
 // MARK: - Capture controller
 
 final class CaptureController {
@@ -1476,9 +1561,11 @@ final class CaptureController {
         p.waitUntilExit()
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else { return }
         try? FileManager.default.removeItem(atPath: path)
-        Output.save(png: data)
+        let saved = Output.save(png: data)
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setData(data, forType: .png)
+        Feedback.flash()
+        Feedback.toast(saved != nil ? "Screenshot saved and copied" : "Screenshot copied")
     }
 }
 
