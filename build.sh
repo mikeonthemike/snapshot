@@ -32,4 +32,11 @@ EOF
 # Ad-hoc sign with a requirement tied to the bundle id (not the code hash), so macOS keeps
 # the Screen Recording permission across rebuilds.
 codesign --force --sign - -r='designated => identifier "com.javln.snapshot"' "$APP"
-echo "Built $APP — run: open $APP"
+echo "Built $APP"
+
+# Install a copy where Spotlight, Raycast and Login Items can find it.
+INSTALL_DIR="$HOME/Applications"
+mkdir -p "$INSTALL_DIR"
+rm -rf "$INSTALL_DIR/Snapshot.app"
+ditto "$APP" "$INSTALL_DIR/Snapshot.app"
+echo "Installed $INSTALL_DIR/Snapshot.app"

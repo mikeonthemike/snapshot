@@ -23,12 +23,12 @@ Press a hotkey, drag over the area you want, mark it up, and copy it, save it, p
 
 ```sh
 ./build.sh
-open build/Snapshot.app
+open ~/Applications/Snapshot.app
 ```
 
-The build script compiles the app, wraps it in `build/Snapshot.app`, and signs it with a stable identity so macOS keeps its permissions between rebuilds. If your installed SDK is newer than your Swift compiler, adjust the `-sdk` path in `build.sh` to a matching one.
+The build script compiles the app into `build/Snapshot.app`, installs a copy to `~/Applications/Snapshot.app` (so Spotlight and Raycast can launch it), and signs it with a stable identity so macOS keeps its permissions between rebuilds. If your installed SDK is newer than your Swift compiler, adjust the `-sdk` path in `build.sh` to a matching one.
 
-To start Snapshot at login, add `Snapshot.app` under **System Settings → General → Login Items**.
+To start Snapshot at login, add `~/Applications/Snapshot.app` under **System Settings → General → Login Items**.
 
 ### Permissions
 
