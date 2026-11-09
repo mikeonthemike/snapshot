@@ -15,15 +15,11 @@ extension CaptureView {
 
     func showToolbar() {
         guard selection != nil else { return }
-        let items: [(Tool, String, String)] = [
-            (.rect, "rectangle", "Rectangle"), (.arrow, "arrow.up.right", "Arrow"),
-            (.pen, "pencil.tip", "Pen"), (.text, "textformat", "Text"),
-        ]
         var views: [NSView] = []
-        for (t, sym, tip) in items {
-            let b = button(sym, tip, #selector(toolTapped(_:)))
-            b.tag = items.firstIndex { $0.0 == t }!
-            toolButtons[t] = b
+        for (i, spec) in AnnotationTools.all.enumerated() {
+            let b = button(spec.symbol, spec.title, #selector(toolTapped(_:)))
+            b.tag = i
+            toolButtons[spec.tool] = b
             views.append(b)
         }
         let cb = button("circle.fill", "Color", #selector(cycleColor))
@@ -60,8 +56,7 @@ extension CaptureView {
 
     @objc func toolTapped(_ sender: NSButton) {
         commitText()
-        let order: [Tool] = [.rect, .arrow, .pen, .text]
-        let t = order[sender.tag]
+        let t = AnnotationTools.all[sender.tag].tool
         tool = (tool == t) ? .select : t
         updateToolHighlight()
     }
