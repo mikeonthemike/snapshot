@@ -11,6 +11,8 @@ final class MenuBarController: NSObject {
     private var fullItem: NSMenuItem!
     private var textItem: NSMenuItem!
     private var windowItem: NSMenuItem!
+    /// Rebuilt each time it opens; see `MenuBarController+History.swift`.
+    let historyMenu = NSMenu(title: "Recent Captures")
     private var countingDown = false
 
     override init() {
@@ -63,6 +65,10 @@ final class MenuBarController: NSObject {
         recDelayItem.toolTip = "Wait a few seconds, then select the area to record"
         menu.addItem(recDelayItem)
         menu.addItem(.separator())
+        let historyItem = NSMenuItem(title: "Recent Captures", action: nil, keyEquivalent: "")
+        historyMenu.delegate = self
+        historyItem.submenu = historyMenu
+        menu.addItem(historyItem)
         menu.addItem(withTitle: "Open Save Folder", action: #selector(openFolder), keyEquivalent: "")
         menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         menu.addItem(.separator())
@@ -73,6 +79,7 @@ final class MenuBarController: NSObject {
             "Capture Full Screen": "Capture the whole main display to the clipboard and your save folder",
             "Capture Window": "Click a window to capture it on its own, to the clipboard and your save folder",
             "Copy Text from Screen": "Select an area and copy the text in it to the clipboard",
+            "Recent Captures": "Copy, pin or save one of your last few captures",
             "Open Save Folder": "Open the folder where screenshots and recordings are saved",
             "Settings…": "Choose where screenshots and recordings are saved",
             "Quit Snapshot": "Quit Snapshot and remove it from the menu bar",
