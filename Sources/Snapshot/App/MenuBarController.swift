@@ -9,6 +9,7 @@ final class MenuBarController: NSObject {
     private var recordingStart = Date()
     private var captureItem: NSMenuItem!
     private var fullItem: NSMenuItem!
+    private var textItem: NSMenuItem!
     private var countingDown = false
 
     override init() {
@@ -33,6 +34,7 @@ final class MenuBarController: NSObject {
         let menu = NSMenu()
         captureItem = menu.addItem(withTitle: "Capture Area", action: #selector(captureArea), keyEquivalent: "")
         fullItem = menu.addItem(withTitle: "Capture Full Screen", action: #selector(captureFull), keyEquivalent: "")
+        textItem = menu.addItem(withTitle: "Copy Text from Screen", action: #selector(copyText), keyEquivalent: "")
         let delayItem = NSMenuItem(title: "Capture After Delay", action: nil, keyEquivalent: "")
         let delayMenu = NSMenu()
         for secs in [3, 5] {
@@ -67,6 +69,7 @@ final class MenuBarController: NSObject {
             "Capture Area": "Drag to select a region, then annotate, copy, save or record it",
             "Record Video": "Select an area, adjust it, then start recording (Return or the record button)",
             "Capture Full Screen": "Capture the whole main display to the clipboard and your save folder",
+            "Copy Text from Screen": "Select an area and copy the text in it to the clipboard",
             "Open Save Folder": "Open the folder where screenshots and recordings are saved",
             "Settings…": "Choose where screenshots and recordings are saved",
             "Quit Snapshot": "Quit Snapshot and remove it from the menu bar",
@@ -79,12 +82,14 @@ final class MenuBarController: NSObject {
     /// Shows the current shortcuts in the menu and tooltips.
     func applyHotkeys() {
         let cap = HotKeys.shared.binding(.capture), full = HotKeys.shared.binding(.fullScreen)
-        for (item, hk) in [(captureItem!, cap), (fullItem!, full)] {
+        let text = HotKeys.shared.binding(.copyText)
+        for (item, hk) in [(captureItem!, cap), (fullItem!, full), (textItem!, text)] {
             item.keyEquivalent = hk.menuKey
             item.keyEquivalentModifierMask = hk.menuMask
         }
         captureItem.toolTip = "Drag to select a region, then annotate, copy, save or record it (\(cap.display))"
         fullItem.toolTip = "Capture the whole main display to the clipboard and your save folder (\(full.display))"
+        textItem.toolTip = "Select an area and copy the text in it to the clipboard (\(text.display))"
         if !Recorder.shared.isRecording {
             statusItem.button?.toolTip = "Snapshot — capture screenshots (\(cap.display))"
         }
@@ -100,7 +105,12 @@ final class MenuBarController: NSObject {
 
     @objc private func recordArea() {
         guard !countingDown else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { CaptureController.shared.begin(video: true) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { CaptureController.shared.begin(mode: .video) }
+    }
+
+    @objc private func copyText() {
+        guard !countingDown else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { CaptureController.shared.begin(mode: .text) }
     }
 
     @objc private func captureFull() {
@@ -109,7 +119,7 @@ final class MenuBarController: NSObject {
 
     @objc private func delayedArea(_ sender: NSMenuItem) { countdown(sender.tag) { CaptureController.shared.begin() } }
     @objc private func delayedFull(_ sender: NSMenuItem) { countdown(sender.tag) { CaptureController.shared.fullScreen() } }
-    @objc private func delayedRecord(_ sender: NSMenuItem) { countdown(sender.tag) { CaptureController.shared.begin(video: true) } }
+    @objc private func delayedRecord(_ sender: NSMenuItem) { countdown(sender.tag) { CaptureController.shared.begin(mode: .video) } }
 
     /// Counts down in the menu bar, clears the title, then runs `action` once the bar is clean.
     private func countdown(_ seconds: Int, then action: @escaping () -> Void) {

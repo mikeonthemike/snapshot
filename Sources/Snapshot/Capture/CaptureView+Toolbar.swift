@@ -33,10 +33,13 @@ extension CaptureView {
         views.append(button("arrow.uturn.backward", "Undo (⌘Z)", #selector(undo)))
         views.append(button("xmark", "Cancel (Esc)", #selector(cancel)))
         views.append(button("pin", "Pin to screen (⌘P)", #selector(pin)))
-        let rec = button(videoMode ? "record.circle.fill" : "record.circle",
-                         videoMode ? "Record this area (⌘R / Return)" : "Record this area (⌘R)", #selector(record))
+        let rec = button(mode == .video ? "record.circle.fill" : "record.circle",
+                         mode == .video ? "Record this area (⌘R / Return)" : "Record this area (⌘R)", #selector(record))
         rec.contentTintColor = .systemRed
         views.append(rec)
+        let ocr = button("text.viewfinder", mode == .text ? "Copy text (⌘T / Return)" : "Copy text (⌘T)", #selector(copyText))
+        if mode == .text { ocr.contentTintColor = .systemBlue }
+        views.append(ocr)
         views.append(button("square.and.arrow.down", "Save (⌘S)", #selector(save)))
         views.append(button("doc.on.doc", "Copy (⌘C / Return)", #selector(copyImage)))
 

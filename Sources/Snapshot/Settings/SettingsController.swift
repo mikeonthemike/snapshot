@@ -4,6 +4,8 @@ final class SettingsController: NSObject, NSWindowDelegate {
     static let shared = SettingsController()
     private var window: NSWindow?
     private let pathField = NSTextField(labelWithString: "")
+    private let loginCheckbox = NSButton(checkboxWithTitle: "Open Snapshot at login", target: nil, action: nil)
+    private let loginNote = NSTextField(labelWithString: "")
     private var fields: [HotKeyField] = []
     private var warnings: [HotKeyAction: NSTextField] = [:]
 
@@ -25,6 +27,11 @@ final class SettingsController: NSObject, NSWindowDelegate {
         pathField.font = .systemFont(ofSize: 12)
         pathField.textColor = .secondaryLabelColor
         pathField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        loginCheckbox.target = self
+        loginCheckbox.action = #selector(toggleLogin)
+        loginNote.font = .systemFont(ofSize: 11)
+        loginNote.textColor = .systemOrange
 
         let choose = NSButton(title: "Choose…", target: self, action: #selector(choose))
         let resetFolder = NSButton(title: "Reset to Desktop", target: self, action: #selector(resetFolder))
@@ -49,12 +56,14 @@ final class SettingsController: NSObject, NSWindowDelegate {
         let resetKeys = NSButton(title: "Reset Shortcuts", target: self, action: #selector(resetKeys))
 
         let stack = NSStackView(views: [
+            heading("General"), loginCheckbox, loginNote,
             heading("Save screenshots and recordings to:"), pathField, folderButtons,
             heading("Shortcuts"),
         ] + rows + [resetKeys])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 10
+        stack.setCustomSpacing(22, after: loginNote)
         stack.setCustomSpacing(22, after: folderButtons)
         stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
 
@@ -73,6 +82,8 @@ final class SettingsController: NSObject, NSWindowDelegate {
     private func refresh() {
         pathField.stringValue = (Output.folder.path as NSString).abbreviatingWithTildeInPath
         fields.forEach { $0.refresh() }
+        loginCheckbox.state = LaunchAtLogin.isEnabled ? .on : .off
+        loginNote.stringValue = LaunchAtLogin.needsApproval ? "Approve Snapshot in System Settings → General → Login Items" : ""
         for (a, label) in warnings {
             label.stringValue = HotKeys.shared.failed.contains(a) ? "In use by another app" : ""
         }
@@ -94,6 +105,19 @@ final class SettingsController: NSObject, NSWindowDelegate {
                 if r == .OK, let url = panel.url { Output.folder = url; self?.refresh() }
             }
         }
+    }
+
+    @objc private func toggleLogin() {
+        do {
+            try LaunchAtLogin.setEnabled(loginCheckbox.state == .on)
+        } catch {
+            NSSound.beep()
+            let alert = NSAlert()
+            alert.messageText = "Couldn't change the login item"
+            alert.informativeText = error.localizedDescription
+            alert.runModal()
+        }
+        refresh()
     }
 
     @objc private func resetFolder() {

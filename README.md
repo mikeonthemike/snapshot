@@ -14,7 +14,8 @@ Press a hotkey, drag over the area you want, mark it up, and copy it, save it, p
 - **Full-screen capture** – grab the whole display from the menu.
 - **Delayed capture** – from the menu bar, **Capture After Delay** waits 3 or 5 seconds (with a countdown in the menu bar) before capturing an area or the full screen, so you can open a menu or hover state first.
 - **Record Video from the menu** – **Record Video** and **Record Video After Delay** (3 or 5 seconds) open the area selector in video mode. Adjust the area, then press Return or the record button; the usual toolbar stays available.
-- **Settings** – choose where screenshots and recordings are saved, and rebind the global capture shortcuts.
+- **Copy text from screen** – drag over any text (an image, a video, a PDF you can't select) and the recognised text goes on the clipboard. Runs on-device with Apple's Vision framework.
+- **Settings** – choose where screenshots and recordings are saved, rebind the global shortcuts, and open Snapshot at login.
 
 ## Requirements
 
@@ -36,7 +37,7 @@ Run the tests with:
 swift test
 ```
 
-To start Snapshot at login, add `~/Applications/Snapshot.app` under **System Settings → General → Login Items**.
+To start Snapshot at login, tick **Open Snapshot at login** in Settings. If macOS asks, approve it under **System Settings → General → Login Items**.
 
 ### Permissions
 
@@ -48,10 +49,12 @@ The first time you capture, macOS asks for **Screen Recording** access. The firs
 | --- | --- |
 | Start a capture | `⌥⇧A` (configurable) |
 | Capture the full screen | `⌥⇧F` (configurable) |
+| Copy text from screen | `⌥⇧T` (configurable) |
 | Copy selection | `Return` or `⌘C` |
 | Save selection | `⌘S` |
 | Pin selection | `⌘P` |
 | Record selection | `⌘R` |
+| Copy text in selection | `⌘T` |
 | Undo annotation | `⌘Z` |
 | Cancel | `Esc` |
 | Stop recording | Stop button on the control bar, or press the capture hotkey |
@@ -93,7 +96,8 @@ Sources/Snapshot/
     HotKeys.swift                Carbon registration and persistence
     HotKeyField.swift            Shortcut recorder button used in Settings
   Settings/SettingsController.swift
-  Support/                       Output (save folder, file names), Pasteboard, permission check, HUD container
+  Text/TextRecognizer.swift      Vision OCR and copy-to-clipboard
+  Support/                       Output (save folder, file names), Pasteboard, LaunchAtLogin, permission check, HUD container
 Tests/SnapshotTests/             swift-testing suites for the pure logic
 ```
 
