@@ -47,7 +47,7 @@ struct HotKey: Codable, Equatable {
 }
 
 enum HotKeyAction: UInt32, CaseIterable {
-    case capture = 1, fullScreen = 2, copyText = 3
+    case capture = 1, fullScreen = 2, copyText = 3, captureWindow = 4
 
     var defaultsKey: String { "hotkey.\(rawValue)" }
     var title: String {
@@ -55,6 +55,7 @@ enum HotKeyAction: UInt32, CaseIterable {
         case .capture: return "Capture area"
         case .fullScreen: return "Capture full screen"
         case .copyText: return "Copy text from screen"
+        case .captureWindow: return "Capture window"
         }
     }
     var fallback: HotKey {
@@ -62,6 +63,7 @@ enum HotKeyAction: UInt32, CaseIterable {
         case .capture: return HotKey(keyCode: UInt32(kVK_ANSI_A), modifiers: UInt32(optionKey | shiftKey), key: "A")
         case .fullScreen: return HotKey(keyCode: UInt32(kVK_ANSI_F), modifiers: UInt32(optionKey | shiftKey), key: "F")
         case .copyText: return HotKey(keyCode: UInt32(kVK_ANSI_T), modifiers: UInt32(optionKey | shiftKey), key: "T")
+        case .captureWindow: return HotKey(keyCode: UInt32(kVK_ANSI_W), modifiers: UInt32(optionKey | shiftKey), key: "W")
         }
     }
 }

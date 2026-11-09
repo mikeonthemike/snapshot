@@ -16,6 +16,14 @@ enum ScreenGrabber {
         return try? Data(contentsOf: URL(fileURLWithPath: path))
     }
 
+    /// PNG data for a single window, captured on its own even if other windows cover it. Rounded corners are
+    /// transparent; the drop shadow is included unless `includeShadow` is false.
+    static func windowPNG(id: CGWindowID, includeShadow: Bool) -> Data? {
+        guard let path = run(["-l", "\(id)"] + (includeShadow ? [] : ["-o"])) else { return nil }
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        return try? Data(contentsOf: URL(fileURLWithPath: path))
+    }
+
     /// Runs `screencapture -x <args> <temp file>` and returns the temp file path on launch success.
     private static func run(_ args: [String]) -> String? {
         let path = NSTemporaryDirectory() + "snapshot-\(UUID().uuidString).png"

@@ -2,11 +2,11 @@
 
 Ordered by priority: value to the user first, then effort, then what unblocks later items. Work top to bottom.
 
-Done: launch at login toggle, copy text from screen (OCR), better annotations (pixelate, step numbers, highlighter).
+Done: launch at login toggle, copy text from screen (OCR), better annotations (pixelate, step numbers, highlighter), capture a window.
 
 ## Next up
 
-1. **Capture a window** — hover to highlight a window, click to capture, with optional shadow and rounded corners.
+1. **Toolbar icon tooltips** — every icon in the capture toolbar (and the recording bar) shows a clear tooltip on hover, including its keyboard shortcut. Check they appear reliably over the overlay.
 2. **Capture history** — recent captures in the menu bar with thumbnails; re-copy, re-pin or reveal in Finder.
 
 ## Then
