@@ -13,6 +13,8 @@ final class CaptureView: NSView {
     var color = annotationPalette[0]
     var annotations: [Annotation] = []
     var current: Annotation?
+    /// The magnifier shown while ⌥ is held; created on first use.
+    var loupe: LoupeView?
     var dragStart: CGPoint?
     var toolbar: NSView?
     var toolButtons: [Tool: NSButton] = [:]
@@ -46,7 +48,16 @@ final class CaptureView: NSView {
         addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .activeAlways, .inVisibleRect], owner: self))
     }
 
-    override func mouseMoved(with event: NSEvent) { refreshCursor(at: convert(event.locationInWindow, from: nil)) }
+    override func mouseMoved(with event: NSEvent) {
+        let p = convert(event.locationInWindow, from: nil)
+        refreshCursor(at: p)
+        updateLoupe(at: p)
+    }
+
+    override func flagsChanged(with event: NSEvent) {
+        super.flagsChanged(with: event)
+        updateLoupe()
+    }
 
     func refreshCursor(at p: CGPoint? = nil) {
         let loc = p ?? window.map { convert($0.mouseLocationOutsideOfEventStream, from: nil) } ?? .zero
@@ -85,7 +96,7 @@ final class CaptureView: NSView {
         dim.fill()
 
         guard let s = selection else {
-            if mode == .text { drawHintBanner("Drag over the text you want to copy  ·  Esc to cancel", in: bounds) }
+            if mode == .text { drawHintBanner("Drag over the text you want to copy  ·  Hold ⌥ to magnify  ·  Esc to cancel", in: bounds) }
             return
         }
         NSGraphicsContext.saveGraphicsState()
@@ -151,6 +162,7 @@ final class CaptureView: NSView {
 
     override func mouseDragged(with event: NSEvent) {
         var p = convert(event.locationInWindow, from: nil)
+        updateLoupe(at: p)
         if let start = dragStart {
             selection = CGRect.spanning(start, p).intersection(bounds)
         } else if let h = activeHandle {
