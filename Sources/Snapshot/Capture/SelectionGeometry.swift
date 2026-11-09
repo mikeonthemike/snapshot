@@ -92,3 +92,41 @@ enum SelectionGeometry {
         return origin
     }
 }
+
+/// The arrow keys, as used to nudge the selection.
+enum ArrowKey: CaseIterable {
+    case left, right, up, down
+
+    init?(keyCode: UInt16) {
+        switch keyCode {
+        case 123: self = .left
+        case 124: self = .right
+        case 125: self = .down
+        case 126: self = .up
+        default: return nil
+        }
+    }
+
+    /// Unit step in the capture view's flipped space (y grows downward).
+    var vector: CGPoint {
+        switch self {
+        case .left: return CGPoint(x: -1, y: 0)
+        case .right: return CGPoint(x: 1, y: 0)
+        case .up: return CGPoint(x: 0, y: -1)
+        case .down: return CGPoint(x: 0, y: 1)
+        }
+    }
+}
+
+extension SelectionGeometry {
+    /// Smallest selection the keyboard can shrink to, matching the minimum for mouse resizing.
+    static let minimumSize: CGFloat = 8
+
+    /// The selection with its width and height changed by `dw` and `dh`, top-left fixed, kept between
+    /// `minimumSize` and the edge of `bounds`.
+    static func resized(_ s: CGRect, byWidth dw: CGFloat, height dh: CGFloat, within bounds: CGRect) -> CGRect {
+        let w = min(max(s.width + dw, minimumSize), bounds.maxX - s.minX)
+        let h = min(max(s.height + dh, minimumSize), bounds.maxY - s.minY)
+        return CGRect(x: s.minX, y: s.minY, width: w, height: h)
+    }
+}

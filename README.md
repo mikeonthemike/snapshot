@@ -7,6 +7,7 @@ Press a hotkey, drag over the area you want, mark it up, and copy it, save it, p
 ## Features
 
 - **Region capture** – freeze the screen, drag to select, then move or resize the selection with handles. Works across multiple displays and captures at full Retina resolution.
+- **Keyboard nudging** – with a selection in place, the arrow keys move it 1 point at a time (hold ⇧ for 10), taking your annotations with it. Hold ⌥ with the arrows to resize it instead: → and ↓ grow, ← and ↑ shrink, with the top-left corner fixed.
 - **Loupe** – hold **⌥** while selecting or resizing to magnify the pixels around the cursor, with a crosshair on the exact pixel and its coordinates, so you can place an edge precisely.
 - **Annotations** – rectangles, arrows, freehand pen, a translucent highlighter, numbered step markers and text, with a color picker and undo. **Pixelate** hides sensitive information (passwords, emails, names) under coarse blocks. The pixelated content is not recoverable in the saved image.
 - **Copy or save** – copy to the clipboard in one keystroke, or save a PNG to your chosen folder. Copying doesn't save a file unless you tick **Also save a file when copying a capture** in Settings.
@@ -60,6 +61,8 @@ The first time you capture, macOS asks for **Screen Recording** access. The firs
 | Record selection | `⌘R` |
 | Copy text in selection | `⌘T` |
 | Magnify around the cursor | hold `⌥` |
+| Nudge the selection | arrow keys (`⇧` for 10 points) |
+| Resize the selection | `⌥` + arrow keys (`⇧` for 10 points) |
 | Undo annotation | `⌘Z` |
 | Cancel | `Esc` |
 | Stop recording | Stop button on the control bar, or press the capture hotkey |
@@ -87,6 +90,7 @@ Sources/Snapshot/
     CaptureView+Text.swift       Text annotation editing
     CaptureView+Toolbar.swift    Floating toolbar and tool/colour/undo actions
     CaptureView+Loupe.swift      Shows the loupe while ⌥ is held
+    CaptureView+Nudge.swift      Arrow-key move and resize of the selection
     Loupe/                       LoupeGeometry (pure, tested) and LoupeView
     CaptureView+Actions.swift    Rendering the selection and the copy/save/pin/record actions
     CaptureViewDelegate.swift    What the overlay asks of the app (keeps the view free of side effects)
