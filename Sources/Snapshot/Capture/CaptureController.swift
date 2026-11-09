@@ -6,6 +6,28 @@ final class CaptureController {
     private(set) var windows: [OverlayWindow] = []
 
     func begin(mode: CaptureMode = .image) {
+        present { [unowned self] screen, img, scale in
+            let view = CaptureView(frame: CGRect(origin: .zero, size: screen.frame.size), image: img, scale: scale)
+            view.mode = mode
+            view.delegate = self
+            return view
+        }
+    }
+
+    /// Lets the user click a window to capture it.
+    func beginWindowPick() {
+        let list = WindowList.current()
+        present { [unowned self] screen, img, _ in
+            let display = CGDisplayBounds(screen.displayID ?? CGMainDisplayID())
+            let view = WindowPickerView(frame: CGRect(origin: .zero, size: screen.frame.size), image: img, windows: list, displayBounds: display)
+            view.delegate = self
+            return view
+        }
+        windows.compactMap { $0.contentView as? WindowPickerView }.forEach { $0.updateHover() }
+    }
+
+    /// Freezes every display behind a full-screen overlay window, each showing the view `makeView` returns.
+    private func present(_ makeView: (_ screen: NSScreen, _ image: NSImage, _ scale: CGFloat) -> NSView) {
         guard windows.isEmpty, !Recorder.shared.isRecording, ScreenCapturePermission.ensure() else { return }
         var shots: [(NSScreen, NSImage)] = []
         for (i, screen) in NSScreen.screens.enumerated() {
@@ -20,9 +42,7 @@ final class CaptureController {
             w.backgroundColor = .clear
             w.hasShadow = false
             w.isReleasedWhenClosed = false
-            let view = CaptureView(frame: CGRect(origin: .zero, size: screen.frame.size), image: img, scale: pixels / screen.frame.width)
-            view.mode = mode
-            view.delegate = self
+            let view = makeView(screen, img, pixels / screen.frame.width)
             w.contentView = view
             w.setFrame(screen.frame, display: true)
             w.makeKeyAndOrderFront(nil)
@@ -75,6 +95,23 @@ extension CaptureController: CaptureViewDelegate {
         // Give the overlay a moment to disappear before the first frame is captured.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             Recorder.shared.start(displayID: displayID, rect: rect, scale: scale)
+        }
+    }
+}
+
+extension CaptureController: WindowPickerDelegate {
+    func windowPickerDidCancel(_ view: WindowPickerView) { finish() }
+
+    func windowPicker(_ view: WindowPickerView, didPick window: WindowInfo) {
+        finish()
+        // Let the overlay disappear before grabbing.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            guard let png = ScreenGrabber.windowPNG(id: window.id, includeShadow: Preferences.includeWindowShadow) else {
+                NSSound.beep()
+                return
+            }
+            Output.save(png: png)
+            Pasteboard.copy(png: png)
         }
     }
 }

@@ -85,7 +85,7 @@ final class CaptureView: NSView {
         dim.fill()
 
         guard let s = selection else {
-            if mode == .text { drawHint("Drag over the text you want to copy  ·  Esc to cancel") }
+            if mode == .text { drawHintBanner("Drag over the text you want to copy  ·  Esc to cancel", in: bounds) }
             return
         }
         NSGraphicsContext.saveGraphicsState()
@@ -119,17 +119,6 @@ final class CaptureView: NSView {
         NSColor.black.withAlphaComponent(0.7).setFill()
         NSBezierPath(roundedRect: pill, xRadius: 4, yRadius: 4).fill()
         label.draw(at: CGPoint(x: pill.minX + 6, y: pill.minY + 2), withAttributes: attrs)
-    }
-
-    private func drawHint(_ text: String) {
-        let attrs: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 15, weight: .medium), .foregroundColor: NSColor.white,
-        ]
-        let size = (text as NSString).size(withAttributes: attrs)
-        let pill = CGRect(x: bounds.midX - size.width / 2 - 16, y: 60, width: size.width + 32, height: size.height + 16)
-        NSColor.black.withAlphaComponent(0.75).setFill()
-        NSBezierPath(roundedRect: pill, xRadius: pill.height / 2, yRadius: pill.height / 2).fill()
-        (text as NSString).draw(at: CGPoint(x: pill.minX + 16, y: pill.minY + 8), withAttributes: attrs)
     }
 
     // MARK: Mouse
