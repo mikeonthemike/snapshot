@@ -106,7 +106,7 @@ Sources/Snapshot/
   Window/
     WindowInfo.swift             Window-server list, parsing and hit-testing (pure, tested)
     WindowPickerView.swift       Overlay that highlights and picks a window
-  Support/                       Output (save folder, file names), Preferences, Pasteboard, LaunchAtLogin, hint banner, permission check, HUD container
+  Support/                       Output (save folder, file names), Preferences, Pasteboard, LaunchAtLogin, hint banner, TipButton (tooltips that show over the overlay), permission check, HUD container
 Tests/SnapshotTests/             swift-testing suites for the pure logic
 ```
 
@@ -115,5 +115,6 @@ Tests/SnapshotTests/             swift-testing suites for the pure logic
 - **Dependencies point inward.** Views (`CaptureView`, `PinView`) don't call the recorder, the save folder or the clipboard directly. They tell a delegate or callback what the user asked for, and the controller decides what happens. `HotKeys` reports a `HotKeyAction`; `AppDelegate` decides what each one does.
 - **Put logic in pure types.** Anything that can be computed from values (geometry, shortcut formatting, file naming) lives in a type with no views or global state, with tests in `Tests/SnapshotTests`. Keep views thin.
 - **A drawing tool is one file.** Add a `ToolSpec` in `Capture/Annotations/Tools/`, a `Tool` case, and one line in `AnnotationTools.all`. The toolbar and mouse handling are driven by the registry.
+- **Tooltips on overlay controls use `TipButton`.** macOS draws native tooltips well below the capture overlay and recording bar, so they never show there. Use `TipButton` and set `tip` instead of `toolTip`.
 - **One feature, one folder.** A new capability (OCR, GIF export, a new annotation tool) gets its own file or folder and a single hook where it plugs in, rather than another branch in an existing type.
 - **Run `swift test` and `./build.sh` before committing.** UI behaviour (overlay, recording) still needs a manual check.

@@ -3,9 +3,9 @@ import Cocoa
 // The floating toolbar beside the selection and the tool/colour/undo actions behind it.
 extension CaptureView {
     func button(_ symbol: String, _ tip: String, _ action: Selector) -> NSButton {
-        let b = NSButton(image: NSImage(systemSymbolName: symbol, accessibilityDescription: tip)!, target: self, action: action)
+        let b = TipButton(image: NSImage(systemSymbolName: symbol, accessibilityDescription: tip)!, target: self, action: action)
         b.isBordered = false
-        b.toolTip = tip
+        b.tip = tip
         b.wantsLayer = true
         b.layer?.cornerRadius = 6
         b.widthAnchor.constraint(equalToConstant: 30).isActive = true
@@ -22,7 +22,7 @@ extension CaptureView {
             toolButtons[spec.tool] = b
             views.append(b)
         }
-        let cb = button("circle.fill", "Color", #selector(cycleColor))
+        let cb = button("circle.fill", "Color (click to change)", #selector(cycleColor))
         cb.contentTintColor = color
         colorButton = cb
         views.append(cb)

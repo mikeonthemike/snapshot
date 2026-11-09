@@ -5,8 +5,8 @@ final class RecordingBar: NSObject {
     private let panel: NSPanel
     private let timeLabel = NSTextField(labelWithString: "0:00")
     private let dot = NSTextField(labelWithString: "●")
-    private let pauseButton = NSButton()
-    private let micButton = NSButton()
+    private let pauseButton = TipButton()
+    private let micButton = TipButton()
     private var timer: Timer?
 
     init(screen: NSScreen, area: CGRect) {
@@ -27,9 +27,9 @@ final class RecordingBar: NSObject {
 
         configure(pauseButton, "pause.fill", "Pause", #selector(togglePause))
         configure(micButton, "mic.fill", "Mute microphone", #selector(toggleMic))
-        let discard = NSButton()
+        let discard = TipButton()
         configure(discard, "trash", "Discard recording", #selector(discardTapped))
-        let stop = NSButton()
+        let stop = TipButton()
         configure(stop, "stop.circle.fill", "Stop and save", #selector(stopTapped))
         stop.contentTintColor = .systemRed
 
@@ -46,11 +46,11 @@ final class RecordingBar: NSObject {
         panel.orderFrontRegardless()
     }
 
-    private func configure(_ b: NSButton, _ symbol: String, _ tip: String, _ action: Selector) {
+    private func configure(_ b: TipButton, _ symbol: String, _ tip: String, _ action: Selector) {
         b.image = NSImage(systemSymbolName: symbol, accessibilityDescription: tip)
         b.isBordered = false
         b.contentTintColor = .white
-        b.toolTip = tip
+        b.tip = tip
         b.target = self
         b.action = action
         b.widthAnchor.constraint(equalToConstant: 28).isActive = true
@@ -88,12 +88,12 @@ final class RecordingBar: NSObject {
         dot.textColor = r.isPaused ? .systemGray : .systemRed
         let pauseSymbol = r.isPaused ? "play.fill" : "pause.fill"
         pauseButton.image = NSImage(systemSymbolName: pauseSymbol, accessibilityDescription: nil)
-        pauseButton.toolTip = r.isPaused ? "Resume" : "Pause"
+        pauseButton.tip = r.isPaused ? "Resume" : "Pause"
         micButton.isEnabled = r.micAvailable
         let micOn = r.micAvailable && !r.micMuted
         micButton.image = NSImage(systemSymbolName: micOn ? "mic.fill" : "mic.slash.fill", accessibilityDescription: nil)
         micButton.contentTintColor = micOn ? .white : .systemOrange
-        micButton.toolTip = !r.micAvailable ? "Microphone unavailable (check System Settings → Privacy → Microphone)"
+        micButton.tip = !r.micAvailable ? "Microphone unavailable (check System Settings → Privacy → Microphone)"
             : (r.micMuted ? "Unmute microphone" : "Mute microphone")
     }
 
