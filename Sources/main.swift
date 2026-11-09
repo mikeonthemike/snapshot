@@ -125,6 +125,8 @@ final class CaptureView: NSView, NSTextFieldDelegate {
     var activeHandle: Handle?
     var moveOrigin: CGPoint?
     var originalSelection = CGRect.zero
+    /// Opened from a video menu item: Return starts recording and the record button is highlighted.
+    var videoMode = false
 
     init(frame: NSRect, image: NSImage, scale: CGFloat) {
         self.image = image
@@ -373,7 +375,8 @@ final class CaptureView: NSView, NSTextFieldDelegate {
         views.append(button("arrow.uturn.backward", "Undo (⌘Z)", #selector(undo)))
         views.append(button("xmark", "Cancel (Esc)", #selector(cancel)))
         views.append(button("pin", "Pin to screen (⌘P)", #selector(pin)))
-        let rec = button("record.circle", "Record this area (⌘R)", #selector(record))
+        let rec = button(videoMode ? "record.circle.fill" : "record.circle",
+                         videoMode ? "Record this area (⌘R / Return)" : "Record this area (⌘R)", #selector(record))
         rec.contentTintColor = .systemRed
         views.append(rec)
         views.append(button("square.and.arrow.down", "Save (⌘S)", #selector(save)))
@@ -494,7 +497,7 @@ final class CaptureView: NSView, NSTextFieldDelegate {
         let cmd = event.modifierFlags.contains(.command)
         switch (event.keyCode, event.charactersIgnoringModifiers) {
         case (53, _): cancel()
-        case (36, _), (76, _): if selection != nil { copyImage() }
+        case (36, _), (76, _): if selection != nil { videoMode ? record() : copyImage() }
         case (_, "c") where cmd: if selection != nil { copyImage() }
         case (_, "p") where cmd: if selection != nil { pin() }
         case (_, "r") where cmd: if selection != nil { record() }
@@ -1435,7 +1438,7 @@ final class CaptureController {
         return false
     }
 
-    func begin() {
+    func begin(video: Bool = false) {
         guard windows.isEmpty, !Recorder.shared.isRecording, ensurePermission() else { return }
         var shots: [(NSScreen, NSImage)] = []
         for (i, screen) in NSScreen.screens.enumerated() {
@@ -1451,6 +1454,7 @@ final class CaptureController {
             w.hasShadow = false
             w.isReleasedWhenClosed = false
             let view = CaptureView(frame: CGRect(origin: .zero, size: screen.frame.size), image: img, scale: pixels / screen.frame.width)
+            view.videoMode = video
             w.contentView = view
             w.setFrame(screen.frame, display: true)
             w.makeKeyAndOrderFront(nil)
@@ -1491,6 +1495,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var recordingStart = Date()
     var captureItem: NSMenuItem!
     var fullItem: NSMenuItem!
+    var recordItem: NSMenuItem!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -1516,12 +1521,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         delayItem.toolTip = "Wait a few seconds before capturing, so you can open a menu or hover state first"
         menu.addItem(delayItem)
         menu.addItem(.separator())
+        recordItem = menu.addItem(withTitle: "Record Video", action: #selector(recordArea), keyEquivalent: "")
+        let recDelayItem = NSMenuItem(title: "Record Video After Delay", action: nil, keyEquivalent: "")
+        let recDelayMenu = NSMenu()
+        for secs in [3, 5] {
+            let it = recDelayMenu.addItem(withTitle: "In \(secs) seconds", action: #selector(delayedRecord(_:)), keyEquivalent: "")
+            it.tag = secs
+            it.target = self
+        }
+        recDelayItem.submenu = recDelayMenu
+        recDelayItem.toolTip = "Wait a few seconds, then select the area to record"
+        menu.addItem(recDelayItem)
+        menu.addItem(.separator())
         menu.addItem(withTitle: "Open Save Folder", action: #selector(openFolder), keyEquivalent: "")
         menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit Snapshot", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         let tips = [
             "Capture Area": "Drag to select a region, then annotate, copy, save or record it",
+            "Record Video": "Select an area, adjust it, then start recording (Return or the record button)",
             "Capture Full Screen": "Capture the whole main display to the clipboard and your save folder",
             "Open Save Folder": "Open the folder where screenshots and recordings are saved",
             "Settings…": "Choose where screenshots and recordings are saved",
@@ -1557,6 +1575,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !countingDown else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { CaptureController.shared.begin() }
     }
+
+    @objc func recordArea() {
+        guard !countingDown else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { CaptureController.shared.begin(video: true) }
+    }
+
+    @objc func delayedRecord(_ sender: NSMenuItem) { countdown(sender.tag) { CaptureController.shared.begin(video: true) } }
 
     @objc func captureFull() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { CaptureController.shared.fullScreen() }
