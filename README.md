@@ -12,6 +12,7 @@ Press a hotkey, drag over the area you want, mark it up, and copy it, save it, p
 - **Pin to screen** – float a capture above your other windows. Drag to move, scroll to resize, change opacity from the right-click menu, and double-click to dismiss.
 - **Screen recording** – record the selected area to an H.264 `.mov`, with the recorded region left clear and everything around it dimmed. A floating control bar beside the area gives you a timer, pause/resume, microphone mute, discard and stop.
 - **Full-screen capture** – grab the whole display from the menu.
+- **Delayed capture** – from the menu bar, **Capture After Delay** waits 3 or 5 seconds (with a countdown in the menu bar) before capturing an area or the full screen, so you can open a menu or hover state first.
 - **Settings** – choose where screenshots and recordings are saved, and rebind the global capture shortcuts.
 
 ## Requirements

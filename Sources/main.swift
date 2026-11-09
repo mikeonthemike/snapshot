@@ -1502,6 +1502,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         captureItem = menu.addItem(withTitle: "Capture Area", action: #selector(captureArea), keyEquivalent: "")
         fullItem = menu.addItem(withTitle: "Capture Full Screen", action: #selector(captureFull), keyEquivalent: "")
+        let delayItem = NSMenuItem(title: "Capture After Delay", action: nil, keyEquivalent: "")
+        let delayMenu = NSMenu()
+        for secs in [3, 5] {
+            for (name, sel) in [("Area", #selector(delayedArea(_:))), ("Full Screen", #selector(delayedFull(_:)))] {
+                let it = delayMenu.addItem(withTitle: "\(name) in \(secs) seconds", action: sel, keyEquivalent: "")
+                it.tag = secs
+                it.target = self
+            }
+            if secs == 3 { delayMenu.addItem(.separator()) }
+        }
+        delayItem.submenu = delayMenu
+        delayItem.toolTip = "Wait a few seconds before capturing, so you can open a menu or hover state first"
+        menu.addItem(delayItem)
         menu.addItem(.separator())
         menu.addItem(withTitle: "Open Save Folder", action: #selector(openFolder), keyEquivalent: "")
         menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
@@ -1541,11 +1554,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // Delay so the menu closes before the screen is grabbed.
     @objc func captureArea() {
+        guard !countingDown else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { CaptureController.shared.begin() }
     }
 
     @objc func captureFull() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { CaptureController.shared.fullScreen() }
+    }
+
+    var countingDown = false
+
+    @objc func delayedArea(_ sender: NSMenuItem) { countdown(sender.tag) { CaptureController.shared.begin() } }
+    @objc func delayedFull(_ sender: NSMenuItem) { countdown(sender.tag) { CaptureController.shared.fullScreen() } }
+
+    /// Counts down in the menu bar, clears the title, then runs `action` once the bar is clean.
+    func countdown(_ seconds: Int, then action: @escaping () -> Void) {
+        guard !countingDown, !Recorder.shared.isRecording, CaptureController.shared.ensurePermission() else { return }
+        countingDown = true
+        var remaining = seconds
+        statusItem.length = NSStatusItem.variableLength
+        statusItem.button?.title = " \(remaining)"
+        Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] t in
+            guard let self = self else { t.invalidate(); return }
+            remaining -= 1
+            if remaining > 0 {
+                self.statusItem.button?.title = " \(remaining)"
+                return
+            }
+            t.invalidate()
+            self.statusItem.button?.title = ""
+            self.statusItem.length = NSStatusItem.squareLength
+            self.countingDown = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: action)
+        }
     }
 
     func recordingChanged() {
