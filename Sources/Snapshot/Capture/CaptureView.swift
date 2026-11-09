@@ -168,13 +168,8 @@ final class CaptureView: NSView {
         } else if let h = activeHandle {
             selection = SelectionGeometry.resized(originalSelection, dragging: h, to: p, within: bounds)
         } else if let origin = moveOrigin {
-            let prev = selection!
             let delta = CGPoint(x: p.x - origin.x, y: p.y - origin.y)
-            selection = SelectionGeometry.moved(originalSelection, by: delta, within: bounds)
-            let ddx = selection!.minX - prev.minX, ddy = selection!.minY - prev.minY
-            for i in annotations.indices {
-                annotations[i].points = annotations[i].points.map { CGPoint(x: $0.x + ddx, y: $0.y + ddy) }
-            }
+            moveSelection(to: SelectionGeometry.moved(originalSelection, by: delta, within: bounds))
         } else if current != nil, let s = selection {
             p.x = min(max(p.x, s.minX), s.maxX)
             p.y = min(max(p.y, s.minY), s.maxY)
@@ -216,6 +211,7 @@ final class CaptureView: NSView {
     // MARK: Keyboard
 
     override func keyDown(with event: NSEvent) {
+        if handleArrowKey(event) { return }
         let cmd = event.modifierFlags.contains(.command)
         switch (event.keyCode, event.charactersIgnoringModifiers) {
         case (53, _): cancel()
