@@ -70,6 +70,7 @@ extension CaptureController: CaptureViewDelegate {
     func captureViewDidCancel(_ view: CaptureView) { finish() }
 
     func captureView(_ view: CaptureView, didCopy png: Data) {
+        if Preferences.saveOnCopy { Output.save(png: png) }
         Pasteboard.copy(png: png)
         finish()
     }

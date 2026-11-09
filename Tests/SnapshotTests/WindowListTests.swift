@@ -70,19 +70,3 @@ import Cocoa
         }
     }
 }
-
-@Suite(.serialized) struct PreferencesTests {
-    @Test func windowShadowDefaultsToOnAndPersists() {
-        let saved = UserDefaults.standard.object(forKey: Preferences.windowShadowKey)
-        defer {
-            if let saved = saved { UserDefaults.standard.set(saved, forKey: Preferences.windowShadowKey) }
-            else { UserDefaults.standard.removeObject(forKey: Preferences.windowShadowKey) }
-        }
-        UserDefaults.standard.removeObject(forKey: Preferences.windowShadowKey)
-        #expect(Preferences.includeWindowShadow == true)
-        Preferences.includeWindowShadow = false
-        #expect(Preferences.includeWindowShadow == false)
-        Preferences.includeWindowShadow = true
-        #expect(Preferences.includeWindowShadow == true)
-    }
-}

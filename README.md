@@ -8,7 +8,7 @@ Press a hotkey, drag over the area you want, mark it up, and copy it, save it, p
 
 - **Region capture** – freeze the screen, drag to select, then move or resize the selection with handles. Works across multiple displays and captures at full Retina resolution.
 - **Annotations** – rectangles, arrows, freehand pen, a translucent highlighter, numbered step markers and text, with a color picker and undo. **Pixelate** hides sensitive information (passwords, emails, names) under coarse blocks. The pixelated content is not recoverable in the saved image.
-- **Copy or save** – copy to the clipboard in one keystroke, or save a PNG to your chosen folder.
+- **Copy or save** – copy to the clipboard in one keystroke, or save a PNG to your chosen folder. Copying doesn't save a file unless you tick **Also save a file when copying a capture** in Settings.
 - **Pin to screen** – float a capture above your other windows. Drag to move, scroll to resize, change opacity from the right-click menu, and double-click to dismiss.
 - **Screen recording** – record the selected area to an H.264 `.mov`, with the recorded region left clear and everything around it dimmed. A floating control bar beside the area gives you a timer, pause/resume, microphone mute, discard and stop.
 - **Window capture** – hover to highlight a window and click to capture it on its own, even if other windows cover part of it. It keeps the window's rounded corners and, optionally, its drop shadow (a Settings checkbox), and goes to the clipboard and your save folder.
