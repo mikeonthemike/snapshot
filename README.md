@@ -7,6 +7,7 @@ Press a hotkey, drag over the area you want, mark it up, and copy it, save it, p
 ## Features
 
 - **Region capture** – freeze the screen, drag to select, then move or resize the selection with handles. Works across multiple displays and captures at full Retina resolution.
+- **Size and position readout** – the caption above the selection shows its size and where its top-left corner is (for example `800 × 600 at 120, 340`, in points from the display's top-left), so you can describe or reproduce an area exactly.
 - **Keyboard nudging** – with a selection in place, the arrow keys move it 1 point at a time (hold ⇧ for 10), taking your annotations with it. Hold ⌥ with the arrows to resize it instead: → and ↓ grow, ← and ↑ shrink, with the top-left corner fixed.
 - **Loupe** – hold **⌥** while selecting or resizing to magnify the pixels around the cursor, with a crosshair on the exact pixel and its coordinates, so you can place an edge precisely.
 - **Annotations** – rectangles, arrows, freehand pen, a translucent highlighter, numbered step markers and text, with a color picker and undo. **Pixelate** hides sensitive information (passwords, emails, names) under coarse blocks. The pixelated content is not recoverable in the saved image.
@@ -95,6 +96,7 @@ Sources/Snapshot/
     CaptureView+Actions.swift    Rendering the selection and the copy/save/pin/record actions
     CaptureViewDelegate.swift    What the overlay asks of the app (keeps the view free of side effects)
     SelectionGeometry.swift      Pure geometry: handles, resize, move, toolbar placement
+    SelectionReadout.swift       Size-and-position caption text and placement
     Annotations/
       Annotation.swift           Annotation model and colour palette
       AnnotationTool.swift       ToolSpec and the tool registry (toolbar order)

@@ -121,12 +121,12 @@ final class CaptureView: NSView {
             dot.stroke()
         }
 
-        let label = "\(Int(s.width)) × \(Int(s.height))" as NSString
+        let label = SelectionReadout.text(for: s) as NSString
         let attrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium), .foregroundColor: NSColor.white,
         ]
         let size = label.size(withAttributes: attrs)
-        let pill = CGRect(x: s.minX, y: max(s.minY - size.height - 10, 4), width: size.width + 12, height: size.height + 4)
+        let pill = SelectionReadout.pillFrame(textSize: size, selection: s, bounds: bounds)
         NSColor.black.withAlphaComponent(0.7).setFill()
         NSBezierPath(roundedRect: pill, xRadius: 4, yRadius: 4).fill()
         label.draw(at: CGPoint(x: pill.minX + 6, y: pill.minY + 2), withAttributes: attrs)
