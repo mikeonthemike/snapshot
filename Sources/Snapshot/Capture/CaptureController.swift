@@ -63,6 +63,7 @@ final class CaptureController {
         guard ScreenCapturePermission.ensure(), let data = ScreenGrabber.mainDisplayPNG() else { return }
         Output.save(png: data)
         Pasteboard.copy(png: data)
+        CaptureHistory.record(data)
     }
 }
 
@@ -72,12 +73,14 @@ extension CaptureController: CaptureViewDelegate {
     func captureView(_ view: CaptureView, didCopy png: Data) {
         if Preferences.saveOnCopy { Output.save(png: png) }
         Pasteboard.copy(png: png)
+        CaptureHistory.record(png)
         finish()
     }
 
     func captureView(_ view: CaptureView, didSave png: Data) {
         Output.save(png: png)
         Pasteboard.copy(png: png)
+        CaptureHistory.record(png)
         finish()
     }
 
@@ -88,6 +91,7 @@ extension CaptureController: CaptureViewDelegate {
 
     func captureView(_ view: CaptureView, didPin image: NSImage, at frame: NSRect) {
         finish()
+        if let png = image.pngData { CaptureHistory.record(png) }
         PinWindow.pin(image, at: frame)
     }
 
@@ -113,6 +117,7 @@ extension CaptureController: WindowPickerDelegate {
             }
             Output.save(png: png)
             Pasteboard.copy(png: png)
+            CaptureHistory.record(png)
         }
     }
 }

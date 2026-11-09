@@ -30,4 +30,16 @@ import Foundation
         Preferences.saveOnCopy = false
         #expect(Preferences.saveOnCopy == false)
     }
+
+    @Test func keepHistoryDefaultsToOnAndPersists() {
+        let saved = UserDefaults.standard.object(forKey: Preferences.keepHistoryKey)
+        defer {
+            if let saved = saved { UserDefaults.standard.set(saved, forKey: Preferences.keepHistoryKey) }
+            else { UserDefaults.standard.removeObject(forKey: Preferences.keepHistoryKey) }
+        }
+        UserDefaults.standard.removeObject(forKey: Preferences.keepHistoryKey)
+        #expect(Preferences.keepHistory == true)
+        Preferences.keepHistory = false
+        #expect(Preferences.keepHistory == false)
+    }
 }

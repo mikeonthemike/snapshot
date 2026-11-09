@@ -7,6 +7,7 @@ final class SettingsController: NSObject, NSWindowDelegate {
     private let loginCheckbox = NSButton(checkboxWithTitle: "Open Snapshot at login", target: nil, action: nil)
     private let loginNote = NSTextField(labelWithString: "")
     private let saveOnCopyCheckbox = NSButton(checkboxWithTitle: "Also save a file when copying a capture", target: nil, action: nil)
+    private let historyCheckbox = NSButton(checkboxWithTitle: "Keep recent captures in the menu", target: nil, action: nil)
     private let shadowCheckbox = NSButton(checkboxWithTitle: "Include shadow in window screenshots", target: nil, action: nil)
     private var fields: [HotKeyField] = []
     private var warnings: [HotKeyAction: NSTextField] = [:]
@@ -34,6 +35,8 @@ final class SettingsController: NSObject, NSWindowDelegate {
         loginCheckbox.action = #selector(toggleLogin)
         saveOnCopyCheckbox.target = self
         saveOnCopyCheckbox.action = #selector(toggleSaveOnCopy)
+        historyCheckbox.target = self
+        historyCheckbox.action = #selector(toggleHistory)
         shadowCheckbox.target = self
         shadowCheckbox.action = #selector(toggleShadow)
         loginNote.font = .systemFont(ofSize: 11)
@@ -62,7 +65,7 @@ final class SettingsController: NSObject, NSWindowDelegate {
         let resetKeys = NSButton(title: "Reset Shortcuts", target: self, action: #selector(resetKeys))
 
         let stack = NSStackView(views: [
-            heading("General"), loginCheckbox, loginNote, saveOnCopyCheckbox, shadowCheckbox,
+            heading("General"), loginCheckbox, loginNote, saveOnCopyCheckbox, historyCheckbox, shadowCheckbox,
             heading("Save screenshots and recordings to:"), pathField, folderButtons,
             heading("Shortcuts"),
         ] + rows + [resetKeys])
@@ -90,6 +93,7 @@ final class SettingsController: NSObject, NSWindowDelegate {
         fields.forEach { $0.refresh() }
         loginCheckbox.state = LaunchAtLogin.isEnabled ? .on : .off
         saveOnCopyCheckbox.state = Preferences.saveOnCopy ? .on : .off
+        historyCheckbox.state = Preferences.keepHistory ? .on : .off
         shadowCheckbox.state = Preferences.includeWindowShadow ? .on : .off
         loginNote.stringValue = LaunchAtLogin.needsApproval ? "Approve Snapshot in System Settings → General → Login Items" : ""
         for (a, label) in warnings {
@@ -117,6 +121,12 @@ final class SettingsController: NSObject, NSWindowDelegate {
 
     @objc private func toggleSaveOnCopy() {
         Preferences.saveOnCopy = saveOnCopyCheckbox.state == .on
+    }
+
+    @objc private func toggleHistory() {
+        Preferences.keepHistory = historyCheckbox.state == .on
+        // Turning it off means nothing is kept, so forget what's already there.
+        if !Preferences.keepHistory { CaptureHistory.shared.clear() }
     }
 
     @objc private func toggleShadow() {
