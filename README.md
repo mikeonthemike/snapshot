@@ -19,7 +19,7 @@ Press a hotkey, drag over the area you want, mark it up, and copy it, save it, p
 ## Requirements
 
 - macOS 15 or later
-- Swift command line tools (`xcode-select --install`)
+- Xcode (or a Swift 6 toolchain) with the macOS 15 SDK
 
 ## Build and run
 
@@ -28,7 +28,13 @@ Press a hotkey, drag over the area you want, mark it up, and copy it, save it, p
 open ~/Applications/Snapshot.app
 ```
 
-The build script compiles the app into `build/Snapshot.app`, installs a copy to `~/Applications/Snapshot.app` (so Spotlight and Raycast can launch it), and signs it with a stable identity so macOS keeps its permissions between rebuilds. If your installed SDK is newer than your Swift compiler, adjust the `-sdk` path in `build.sh` to a matching one.
+The build script runs `swift build -c release`, assembles `build/Snapshot.app`, installs a copy to `~/Applications/Snapshot.app` (so Spotlight and Raycast can launch it), and signs it with a stable identity so macOS keeps its permissions between rebuilds.
+
+Run the tests with:
+
+```sh
+swift test
+```
 
 To start Snapshot at login, add `~/Applications/Snapshot.app` under **System Settings → General → Login Items**.
 
@@ -56,16 +62,44 @@ While recording, macOS shows its own "Stop Sharing" control in the menu bar. Sna
 
 ## Project layout
 
+Snapshot is a Swift package with one executable target and a test target. Code is grouped by feature, one type (or a small family of related types) per file.
+
 ```
-Sources/main.swift   The whole app: capture overlay, annotations, recorder, pinning, settings
-build.sh             Builds and signs Snapshot.app
-BACKLOG.md           Planned improvements
+Package.swift
+build.sh                         Builds, bundles, signs and installs Snapshot.app
+Sources/Snapshot/
+  main.swift                     Entry point
+  App/
+    AppDelegate.swift            Launch-time wiring only
+    MenuBarController.swift      Status item, menu, delay countdown, recording indicator
+  Capture/
+    CaptureController.swift      Owns the overlay windows; carries out copy/save/pin/record requests
+    CaptureView.swift            Overlay state, drawing, mouse and keyboard
+    CaptureView+Text.swift       Text annotation editing
+    CaptureView+Toolbar.swift    Floating toolbar and tool/colour/undo actions
+    CaptureView+Actions.swift    Rendering the selection and the copy/save/pin/record actions
+    CaptureViewDelegate.swift    What the overlay asks of the app (keeps the view free of side effects)
+    SelectionGeometry.swift      Pure geometry: handles, resize, move, toolbar placement
+    Annotation.swift             Annotation model, colour palette and drawing
+    ScreenGrabber.swift          screencapture wrapper
+    OverlayWindow.swift
+  Pin/                           Floating pinned screenshots
+  Recording/
+    Recorder.swift               ScreenCaptureKit session and AVAssetWriter output
+    RecordingBar.swift           Floating timer/pause/mic/stop bar
+    RecordingFrame.swift         Dimmed overlay that outlines the recorded area
+  Hotkeys/
+    HotKey.swift                 Shortcut model and the list of bindable actions
+    HotKeys.swift                Carbon registration and persistence
+    HotKeyField.swift            Shortcut recorder button used in Settings
+  Settings/SettingsController.swift
+  Support/                       Output (save folder, file names), Pasteboard, permission check, HUD container
+Tests/SnapshotTests/             swift-testing suites for the pure logic
 ```
 
-## Roadmap
+### Conventions
 
-See [BACKLOG.md](BACKLOG.md) for planned work, including system audio and GIF export.
-
-## License
-
-[MIT](LICENSE)
+- **Dependencies point inward.** Views (`CaptureView`, `PinView`) don't call the recorder, the save folder or the clipboard directly. They tell a delegate or callback what the user asked for, and the controller decides what happens. `HotKeys` reports a `HotKeyAction`; `AppDelegate` decides what each one does.
+- **Put logic in pure types.** Anything that can be computed from values (geometry, shortcut formatting, file naming) lives in a type with no views or global state, with tests in `Tests/SnapshotTests`. Keep views thin.
+- **One feature, one folder.** A new capability (OCR, GIF export, a new annotation tool) gets its own file or folder and a single hook where it plugs in, rather than another branch in an existing type.
+- **Run `swift test` and `./build.sh` before committing.** UI behaviour (overlay, recording) still needs a manual check.

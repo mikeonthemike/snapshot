@@ -7,7 +7,8 @@ APP=build/Snapshot.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-swiftc -O -sdk /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk Sources/main.swift -o "$APP/Contents/MacOS/Snapshot"
+swift build -c release
+cp "$(swift build -c release --show-bin-path)/Snapshot" "$APP/Contents/MacOS/Snapshot"
 
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
