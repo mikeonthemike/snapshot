@@ -5,7 +5,7 @@ final class CaptureController {
     static let shared = CaptureController()
     private(set) var windows: [OverlayWindow] = []
 
-    func begin(video: Bool = false) {
+    func begin(mode: CaptureMode = .image) {
         guard windows.isEmpty, !Recorder.shared.isRecording, ScreenCapturePermission.ensure() else { return }
         var shots: [(NSScreen, NSImage)] = []
         for (i, screen) in NSScreen.screens.enumerated() {
@@ -21,7 +21,7 @@ final class CaptureController {
             w.hasShadow = false
             w.isReleasedWhenClosed = false
             let view = CaptureView(frame: CGRect(origin: .zero, size: screen.frame.size), image: img, scale: pixels / screen.frame.width)
-            view.videoMode = video
+            view.mode = mode
             view.delegate = self
             w.contentView = view
             w.setFrame(screen.frame, display: true)
@@ -58,6 +58,11 @@ extension CaptureController: CaptureViewDelegate {
         Output.save(png: png)
         Pasteboard.copy(png: png)
         finish()
+    }
+
+    func captureView(_ view: CaptureView, didRequestTextFrom image: CGImage) {
+        finish()
+        TextCopier.copyText(from: image)
     }
 
     func captureView(_ view: CaptureView, didPin image: NSImage, at frame: NSRect) {

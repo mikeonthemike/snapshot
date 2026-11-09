@@ -22,8 +22,8 @@ final class CaptureView: NSView {
     var activeHandle: SelectionHandle?
     var moveOrigin: CGPoint?
     var originalSelection = CGRect.zero
-    /// Opened from a video menu item: Return starts recording and the record button is highlighted.
-    var videoMode = false
+    /// What Return does: copy the image, start recording, or copy the recognised text.
+    var mode = CaptureMode.image
 
     init(frame: NSRect, image: NSImage, scale: CGFloat) {
         self.image = image
@@ -82,7 +82,10 @@ final class CaptureView: NSView {
         NSColor.black.withAlphaComponent(0.45).setFill()
         dim.fill()
 
-        guard let s = selection else { return }
+        guard let s = selection else {
+            if mode == .text { drawHint("Drag over the text you want to copy  ·  Esc to cancel") }
+            return
+        }
         NSGraphicsContext.saveGraphicsState()
         NSBezierPath(rect: s).addClip()
         annotations.forEach { $0.draw() }
@@ -113,6 +116,17 @@ final class CaptureView: NSView {
         NSColor.black.withAlphaComponent(0.7).setFill()
         NSBezierPath(roundedRect: pill, xRadius: 4, yRadius: 4).fill()
         label.draw(at: CGPoint(x: pill.minX + 6, y: pill.minY + 2), withAttributes: attrs)
+    }
+
+    private func drawHint(_ text: String) {
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 15, weight: .medium), .foregroundColor: NSColor.white,
+        ]
+        let size = (text as NSString).size(withAttributes: attrs)
+        let pill = CGRect(x: bounds.midX - size.width / 2 - 16, y: 60, width: size.width + 32, height: size.height + 16)
+        NSColor.black.withAlphaComponent(0.75).setFill()
+        NSBezierPath(roundedRect: pill, xRadius: pill.height / 2, yRadius: pill.height / 2).fill()
+        (text as NSString).draw(at: CGPoint(x: pill.minX + 16, y: pill.minY + 8), withAttributes: attrs)
     }
 
     // MARK: Mouse
@@ -173,6 +187,10 @@ final class CaptureView: NSView {
         if dragStart != nil {
             dragStart = nil
             if let s = selection, s.width > 4, s.height > 4 {
+                if mode == .text {
+                    copyText()
+                    return
+                }
                 showToolbar()
             } else {
                 selection = nil
@@ -197,10 +215,11 @@ final class CaptureView: NSView {
         let cmd = event.modifierFlags.contains(.command)
         switch (event.keyCode, event.charactersIgnoringModifiers) {
         case (53, _): cancel()
-        case (36, _), (76, _): if selection != nil { videoMode ? record() : copyImage() }
+        case (36, _), (76, _): if selection != nil { returnPressed() }
         case (_, "c") where cmd: if selection != nil { copyImage() }
         case (_, "p") where cmd: if selection != nil { pin() }
         case (_, "r") where cmd: if selection != nil { record() }
+        case (_, "t") where cmd: if selection != nil { copyText() }
         case (_, "s") where cmd: if selection != nil { save() }
         case (_, "z") where cmd: undo()
         default: super.keyDown(with: event)

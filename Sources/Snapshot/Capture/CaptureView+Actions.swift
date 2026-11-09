@@ -31,6 +31,20 @@ extension CaptureView {
         delegate?.captureView(self, didCopy: png)
     }
 
+    /// Return does whatever the overlay was opened for.
+    func returnPressed() {
+        switch mode {
+        case .image: copyImage()
+        case .video: record()
+        case .text: copyText()
+        }
+    }
+
+    @objc func copyText() {
+        guard let cg = render()?.cgImage else { return }
+        delegate?.captureView(self, didRequestTextFrom: cg)
+    }
+
     @objc func save() {
         guard let png = renderPNG() else { return }
         delegate?.captureView(self, didSave: png)

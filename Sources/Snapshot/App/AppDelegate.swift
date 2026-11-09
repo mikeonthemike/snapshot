@@ -20,6 +20,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if Recorder.shared.isRecording { Recorder.shared.stop() } else { CaptureController.shared.begin() }
         case .fullScreen:
             if !Recorder.shared.isRecording { CaptureController.shared.fullScreen() }
+        case .copyText:
+            if !Recorder.shared.isRecording { CaptureController.shared.begin(mode: .text) }
         }
     }
 }
