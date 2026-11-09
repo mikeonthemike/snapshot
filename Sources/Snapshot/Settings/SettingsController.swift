@@ -6,6 +6,7 @@ final class SettingsController: NSObject, NSWindowDelegate {
     private let pathField = NSTextField(labelWithString: "")
     private let loginCheckbox = NSButton(checkboxWithTitle: "Open Snapshot at login", target: nil, action: nil)
     private let loginNote = NSTextField(labelWithString: "")
+    private let saveOnCopyCheckbox = NSButton(checkboxWithTitle: "Also save a file when copying a capture", target: nil, action: nil)
     private let shadowCheckbox = NSButton(checkboxWithTitle: "Include shadow in window screenshots", target: nil, action: nil)
     private var fields: [HotKeyField] = []
     private var warnings: [HotKeyAction: NSTextField] = [:]
@@ -31,6 +32,8 @@ final class SettingsController: NSObject, NSWindowDelegate {
 
         loginCheckbox.target = self
         loginCheckbox.action = #selector(toggleLogin)
+        saveOnCopyCheckbox.target = self
+        saveOnCopyCheckbox.action = #selector(toggleSaveOnCopy)
         shadowCheckbox.target = self
         shadowCheckbox.action = #selector(toggleShadow)
         loginNote.font = .systemFont(ofSize: 11)
@@ -59,7 +62,7 @@ final class SettingsController: NSObject, NSWindowDelegate {
         let resetKeys = NSButton(title: "Reset Shortcuts", target: self, action: #selector(resetKeys))
 
         let stack = NSStackView(views: [
-            heading("General"), loginCheckbox, loginNote, shadowCheckbox,
+            heading("General"), loginCheckbox, loginNote, saveOnCopyCheckbox, shadowCheckbox,
             heading("Save screenshots and recordings to:"), pathField, folderButtons,
             heading("Shortcuts"),
         ] + rows + [resetKeys])
@@ -86,6 +89,7 @@ final class SettingsController: NSObject, NSWindowDelegate {
         pathField.stringValue = (Output.folder.path as NSString).abbreviatingWithTildeInPath
         fields.forEach { $0.refresh() }
         loginCheckbox.state = LaunchAtLogin.isEnabled ? .on : .off
+        saveOnCopyCheckbox.state = Preferences.saveOnCopy ? .on : .off
         shadowCheckbox.state = Preferences.includeWindowShadow ? .on : .off
         loginNote.stringValue = LaunchAtLogin.needsApproval ? "Approve Snapshot in System Settings → General → Login Items" : ""
         for (a, label) in warnings {
@@ -109,6 +113,10 @@ final class SettingsController: NSObject, NSWindowDelegate {
                 if r == .OK, let url = panel.url { Output.folder = url; self?.refresh() }
             }
         }
+    }
+
+    @objc private func toggleSaveOnCopy() {
+        Preferences.saveOnCopy = saveOnCopyCheckbox.state == .on
     }
 
     @objc private func toggleShadow() {
