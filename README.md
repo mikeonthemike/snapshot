@@ -7,7 +7,7 @@ Press a hotkey, drag over the area you want, mark it up, and copy it, save it, p
 ## Features
 
 - **Region capture** – freeze the screen, drag to select, then move or resize the selection with handles. Works across multiple displays and captures at full Retina resolution.
-- **Annotations** – rectangles, arrows, freehand pen and text, with a color picker and undo.
+- **Annotations** – rectangles, arrows, freehand pen, a translucent highlighter, numbered step markers and text, with a color picker and undo. **Pixelate** hides sensitive information (passwords, emails, names) under coarse blocks. The pixelated content is not recoverable in the saved image.
 - **Copy or save** – copy to the clipboard in one keystroke, or save a PNG to your chosen folder.
 - **Pin to screen** – float a capture above your other windows. Drag to move, scroll to resize, change opacity from the right-click menu, and double-click to dismiss.
 - **Screen recording** – record the selected area to an H.264 `.mov`, with the recorded region left clear and everything around it dimmed. A floating control bar beside the area gives you a timer, pause/resume, microphone mute, discard and stop.
@@ -83,7 +83,11 @@ Sources/Snapshot/
     CaptureView+Actions.swift    Rendering the selection and the copy/save/pin/record actions
     CaptureViewDelegate.swift    What the overlay asks of the app (keeps the view free of side effects)
     SelectionGeometry.swift      Pure geometry: handles, resize, move, toolbar placement
-    Annotation.swift             Annotation model, colour palette and drawing
+    Annotations/
+      Annotation.swift           Annotation model and colour palette
+      AnnotationTool.swift       ToolSpec and the tool registry (toolbar order)
+      Pixelator.swift            Pure pixelation of an image region
+      Tools/                     One file per tool (rect, arrow, pen, highlighter, pixelate, step, text)
     ScreenGrabber.swift          screencapture wrapper
     OverlayWindow.swift
   Pin/                           Floating pinned screenshots
@@ -105,5 +109,6 @@ Tests/SnapshotTests/             swift-testing suites for the pure logic
 
 - **Dependencies point inward.** Views (`CaptureView`, `PinView`) don't call the recorder, the save folder or the clipboard directly. They tell a delegate or callback what the user asked for, and the controller decides what happens. `HotKeys` reports a `HotKeyAction`; `AppDelegate` decides what each one does.
 - **Put logic in pure types.** Anything that can be computed from values (geometry, shortcut formatting, file naming) lives in a type with no views or global state, with tests in `Tests/SnapshotTests`. Keep views thin.
+- **A drawing tool is one file.** Add a `ToolSpec` in `Capture/Annotations/Tools/`, a `Tool` case, and one line in `AnnotationTools.all`. The toolbar and mouse handling are driven by the registry.
 - **One feature, one folder.** A new capability (OCR, GIF export, a new annotation tool) gets its own file or folder and a single hook where it plugs in, rather than another branch in an existing type.
 - **Run `swift test` and `./build.sh` before committing.** UI behaviour (overlay, recording) still needs a manual check.

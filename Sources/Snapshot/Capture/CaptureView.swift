@@ -22,6 +22,8 @@ final class CaptureView: NSView {
     var activeHandle: SelectionHandle?
     var moveOrigin: CGPoint?
     var originalSelection = CGRect.zero
+    /// The unannotated screenshot as pixels, for tools (pixelate) that sample it.
+    lazy var sourceImage: CGImage? = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
     /// What Return does: copy the image, start recording, or copy the recognised text.
     var mode = CaptureMode.image
 
@@ -88,8 +90,9 @@ final class CaptureView: NSView {
         }
         NSGraphicsContext.saveGraphicsState()
         NSBezierPath(rect: s).addClip()
-        annotations.forEach { $0.draw() }
-        current?.draw()
+        let context = annotationContext
+        annotations.forEach { $0.draw(in: context) }
+        current?.draw(in: context)
         NSGraphicsContext.restoreGraphicsState()
 
         NSColor.systemBlue.setStroke()
@@ -143,11 +146,7 @@ final class CaptureView: NSView {
             originalSelection = s
             toolbar?.isHidden = true
         } else if let s = selection, tool != .select, s.contains(p) {
-            if tool == .text {
-                beginText(at: p)
-            } else {
-                current = Annotation(tool: tool, points: [p], color: color)
-            }
+            beginAnnotation(at: p)
         } else {
             toolbar?.removeFromSuperview()
             toolbar = nil
@@ -178,7 +177,11 @@ final class CaptureView: NSView {
         } else if current != nil, let s = selection {
             p.x = min(max(p.x, s.minX), s.maxX)
             p.y = min(max(p.y, s.minY), s.maxY)
-            if current!.tool == .pen { current!.points.append(p) } else { current!.points = [current!.points[0], p] }
+            if AnnotationTools.spec(for: current!.tool)?.interaction == .freehand {
+                current!.points.append(p)
+            } else {
+                current!.points = [current!.points[0], p]
+            }
         }
         needsDisplay = true
     }

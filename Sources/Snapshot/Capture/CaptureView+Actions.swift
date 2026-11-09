@@ -17,7 +17,8 @@ extension CaptureView {
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: true)
         image.draw(in: bounds, from: .zero, operation: .copy, fraction: 1, respectFlipped: true, hints: nil)
-        annotations.forEach { $0.draw() }
+        let context = annotationContext
+        annotations.forEach { $0.draw(in: context) }
         NSGraphicsContext.restoreGraphicsState()
         return ctx.makeImage().map { NSBitmapImageRep(cgImage: $0) }
     }
