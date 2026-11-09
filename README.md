@@ -7,6 +7,7 @@ Press a hotkey, drag over the area you want, mark it up, and copy it, save it, p
 ## Features
 
 - **Region capture** – freeze the screen, drag to select, then move or resize the selection with handles. Works across multiple displays and captures at full Retina resolution.
+- **Loupe** – hold **⌥** while selecting or resizing to magnify the pixels around the cursor, with a crosshair on the exact pixel and its coordinates, so you can place an edge precisely.
 - **Annotations** – rectangles, arrows, freehand pen, a translucent highlighter, numbered step markers and text, with a color picker and undo. **Pixelate** hides sensitive information (passwords, emails, names) under coarse blocks. The pixelated content is not recoverable in the saved image.
 - **Copy or save** – copy to the clipboard in one keystroke, or save a PNG to your chosen folder. Copying doesn't save a file unless you tick **Also save a file when copying a capture** in Settings.
 - **Recent captures** – the last 5 images you copied, saved, pinned or grabbed (area, window or full screen) are listed in the menu bar under **Recent Captures**, each with a thumbnail. Copy it again, pin it, save it to your folder, or remove it. History is stored privately in `~/Library/Application Support/Snapshot/History` (only you can read it), works even for captures you only copied, and can be cleared from the menu or turned off in Settings.
@@ -58,6 +59,7 @@ The first time you capture, macOS asks for **Screen Recording** access. The firs
 | Pin selection | `⌘P` |
 | Record selection | `⌘R` |
 | Copy text in selection | `⌘T` |
+| Magnify around the cursor | hold `⌥` |
 | Undo annotation | `⌘Z` |
 | Cancel | `Esc` |
 | Stop recording | Stop button on the control bar, or press the capture hotkey |
@@ -84,6 +86,8 @@ Sources/Snapshot/
     CaptureView.swift            Overlay state, drawing, mouse and keyboard
     CaptureView+Text.swift       Text annotation editing
     CaptureView+Toolbar.swift    Floating toolbar and tool/colour/undo actions
+    CaptureView+Loupe.swift      Shows the loupe while ⌥ is held
+    Loupe/                       LoupeGeometry (pure, tested) and LoupeView
     CaptureView+Actions.swift    Rendering the selection and the copy/save/pin/record actions
     CaptureViewDelegate.swift    What the overlay asks of the app (keeps the view free of side effects)
     SelectionGeometry.swift      Pure geometry: handles, resize, move, toolbar placement
